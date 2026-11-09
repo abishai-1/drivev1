@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
+import type { Terrain } from './terrain';
+import type { TrackPath } from './track';
+import type { Network } from './paths';
 
 /** Shared handles every builder needs. */
 export interface Ctx {
@@ -7,6 +10,12 @@ export interface Ctx {
   world: CANNON.World;
   /** Mesh/body pairs synced every frame. */
   dynamic: { mesh: THREE.Object3D; body: CANNON.Body }[];
+  /** Per-frame animation hooks (lighthouse beam, spotlights...). */
+  updaters: ((t: number, dt: number) => void)[];
+  terrain: Terrain;
+  track: TrackPath;
+  net: Network;
+  materials: { ground: CANNON.Material; slide: CANNON.Material };
 }
 
 export function el<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -33,25 +42,76 @@ export function syncObject(obj: THREE.Object3D, pos: CANNON.Vec3, quat: CANNON.Q
 // Seeded random so the world layout is stable between reloads
 let seed = 7;
 export const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+export const randRange = (a: number, b: number) => a + rand() * (b - a);
 
-export function makeLabel(text: string, color = '#e8604c'): THREE.Sprite {
+const UP = new THREE.Vector3(0, 1, 0);
+/** Translation + yaw + scale matrix for instancing. */
+export function trs(x: number, y: number, z: number, yaw = 0, sx = 1, sy = 1, sz = 1) {
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3(x, y, z),
+    new THREE.Quaternion().setFromAxisAngle(UP, yaw),
+    new THREE.Vector3(sx, sy, sz)
+  );
+}
+
+/** One draw call for many copies of the same mesh. */
+export function instanced(
+  scene: THREE.Scene,
+  geo: THREE.BufferGeometry,
+  material: THREE.Material,
+  matrices: THREE.Matrix4[],
+  colors?: THREE.Color[],
+  shadows = true
+) {
+  const m = new THREE.InstancedMesh(geo, material, Math.max(matrices.length, 1));
+  m.count = matrices.length;
+  matrices.forEach((t, i) => m.setMatrixAt(i, t));
+  colors?.forEach((c, i) => m.setColorAt(i, c));
+  m.castShadow = shadows;
+  m.receiveShadow = true;
+  m.computeBoundingSphere();
+  scene.add(m);
+  return m;
+}
+
+/** Invisible static collider (half extents). */
+export function staticBox(ctx: Ctx, x: number, y: number, z: number, hx: number, hy: number, hz: number, yaw = 0) {
+  const body = new CANNON.Body({ mass: 0, shape: new CANNON.Box(new CANNON.Vec3(hx, hy, hz)) });
+  body.position.set(x, y, z);
+  if (yaw) body.quaternion.setFromEuler(0, yaw, 0);
+  ctx.world.addBody(body);
+  return body;
+}
+
+/** True when (x, z) is at least `margin` meters off the edge of every road (track included) and out of rivers. */
+export const clearOfRoad = (ctx: Ctx, x: number, z: number, margin = 3) =>
+  ctx.net.roadIndex.nearest(x, z, true).dist > margin && ctx.net.riverIndex.nearest(x, z, true).dist > 2;
+
+export function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('2D canvas not supported');
-  ctx.fillStyle = '#fff7ec';
-  ctx.beginPath();
-  ctx.roundRect(8, 8, 496, 112, 56);
-  ctx.fill();
-  ctx.fillStyle = color;
-  ctx.font = 'bold 64px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, 256, 68);
+  canvas.width = w;
+  canvas.height = h;
+  const g = canvas.getContext('2d');
+  if (!g) throw new Error('2D canvas not supported');
+  draw(g);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+export function makeLabel(text: string, color = '#e8604c', scale = 1): THREE.Sprite {
+  const tex = canvasTexture(512, 128, (g) => {
+    g.fillStyle = '#fff7ec';
+    g.beginPath();
+    g.roundRect(8, 8, 496, 112, 56);
+    g.fill();
+    g.fillStyle = color;
+    g.font = 'bold 60px system-ui, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, 256, 68, 470);
+  });
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false }));
-  sprite.scale.set(6, 1.5, 1);
+  sprite.scale.set(6 * scale, 1.5 * scale, 1);
   return sprite;
 }
