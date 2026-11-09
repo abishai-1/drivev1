@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { C } from './palette';
 import { FARM_FIELDS, GRID_STEP, ISLAND_R, PLACES, RIVER_HALF_WIDTH, RUNWAY, STUNT_PAD, WORLD_HALF, type Place } from './layout';
-import type { Network } from './paths';
+import { ROAD_SINK, type Network } from './paths';
 
 // ---------- Noise ----------
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -163,7 +163,12 @@ export function buildTerrain(scene: THREE.Scene, world: CANNON.World, groundMat:
       roadDist[i + j * n] = r.dist;
       if (r.path && !r.path.bridge[r.index]) {
         const w = smoothstep(9, 1.5, r.dist);
-        h += (r.path.points[r.index].y - h) * w;
+        // sit the ground a little under the road surface so faceted terrain never pokes through it
+        const target = r.path.points[r.index].y - ROAD_SINK * smoothstep(1.5, -0.5, r.dist);
+        h += (target - h) * w;
+      } else if (r.path && r.dist < 1.5) {
+        // under a bridge: only ever lower the ground (the riverbank must not bulge up through the deck)
+        h = Math.min(h, r.path.points[r.index].y - ROAD_SINK - 0.4);
       }
       H[i + j * n] = h;
     }

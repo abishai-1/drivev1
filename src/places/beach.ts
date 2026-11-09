@@ -21,8 +21,11 @@ export function buildBeach(ctx: Ctx) {
 
   // drivable pier out over the water
   const yaw = Math.atan2(ox, oz); // local +z points out to sea
-  const start = p.radius - 6;
-  const len = 44;
+  // start where the sand meets the water (walk outward until the ground drops below sea level)
+  let shore = p.radius;
+  while (shore < 200 && ctx.terrain.sample(p.x + ox * shore, p.z + oz * shore) > 0.3) shore += 2;
+  const start = shore - 14;
+  const len = 50;
   const cx = p.x + ox * (start + len / 2);
   const cz = p.z + oz * (start + len / 2);
   const deckY = 1.5;

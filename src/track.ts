@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Network, Path } from './paths';
+import { ROAD_SINK, type Network, type Path } from './paths';
 import { type Ctx, makeLabel, mat, shadowed, staticBox } from './utils';
 
 export interface TrackHit {
@@ -72,7 +72,8 @@ export function ribbon(path: Path, a: number, b: number, lift: number, vScale: n
     if (i > 0) dist += p.distanceTo(points[(i - 1) % n]);
     const rx = -t.z;
     const rz = t.x;
-    pos.push(p.x + rx * a, p.y + lift, p.z + rz * a, p.x + rx * b, p.y + lift, p.z + rz * b);
+    const y = p.y + lift - ROAD_SINK; // ground under roads is sunk by ROAD_SINK
+    pos.push(p.x + rx * a, y, p.z + rz * a, p.x + rx * b, y, p.z + rz * b);
     uv.push(0, dist / vScale, 1, dist / vScale);
     if (i < count - 1) {
       const k = i * 2;

@@ -18,7 +18,7 @@ export function buildHome(ctx: Ctx) {
   ctx.scene.add(plaza);
 
   // your name, waiting to be driven through
-  buildBrickWord(ctx, 'ABISHAI', new THREE.Vector3(p.x, y, p.z - 12));
+  buildBrickWord(ctx, 'ABISHAI', new THREE.Vector3(p.x, y, p.z - 14));
 
   // fountain
   const fx = p.x + 12;

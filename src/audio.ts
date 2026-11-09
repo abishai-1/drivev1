@@ -6,10 +6,46 @@ import type { VehicleId } from './vehicles/types';
 const MUTE_KEY = 'drivefolio.muted';
 
 interface EngineVoice {
-  osc1: OscillatorNode;
-  osc2: OscillatorNode;
+  main: OscillatorNode; // firing frequency, sawtooth
+  sub: OscillatorNode; // half the firing frequency: the low "rumble"
+  lope: OscillatorNode; // amplitude wobble at the crank rate: the "putt-putt"
+  lopeDepth: GainNode;
+  shaper: WaveShaperNode; // soft clipping for growl
   filter: BiquadFilterNode;
+  intake: BiquadFilterNode; // noise band that opens with throttle
+  intakeGain: GainNode;
   gain: GainNode;
+}
+
+interface EngineProfile {
+  cylinders: number;
+  idle: number; // rpm
+  redline: number; // rpm
+  topSpeed: number; // m/s in top gear
+  tone: number; // low-pass base (Hz)
+  growl: number; // distortion amount
+  lope: number; // 0..1 how lumpy the idle is
+}
+
+const GEARS = [0.2, 0.38, 0.57, 0.78, 1]; // fraction of top speed at the top of each gear
+
+const ENGINES: Partial<Record<VehicleId, EngineProfile>> = {
+  jeep: { cylinders: 4, idle: 850, redline: 6000, topSpeed: 33, tone: 420, growl: 2.5, lope: 0.25 },
+  sports: { cylinders: 8, idle: 1000, redline: 8200, topSpeed: 49, tone: 650, growl: 3.5, lope: 0.3 },
+  monster: { cylinders: 8, idle: 650, redline: 4800, topSpeed: 28, tone: 260, growl: 6, lope: 0.6 },
+  buggy: { cylinders: 2, idle: 1300, redline: 9500, topSpeed: 37, tone: 900, growl: 3, lope: 0.45 },
+};
+
+const clamp = (v: number, a: number, b: number) => Math.min(Math.max(v, a), b);
+
+function softClip(amount: number) {
+  const n = 1024;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = Math.tanh(x * amount) / Math.tanh(amount);
+  }
+  return curve;
 }
 
 export interface SoundState {
@@ -20,16 +56,6 @@ export interface SoundState {
   wind: number; // 0..1
   shore: number; // 0..1 how close to the sea
 }
-
-// per-vehicle engine character: [idle Hz, Hz per m/s, filter base, wave]
-const ENGINES: Record<VehicleId, [number, number, number, OscillatorType]> = {
-  jeep: [48, 2.4, 500, 'sawtooth'],
-  sports: [70, 3.4, 900, 'sawtooth'],
-  monster: [34, 1.6, 380, 'square'],
-  buggy: [80, 3.8, 1100, 'square'],
-  heli: [0, 0, 0, 'sine'],
-  jet: [0, 0, 0, 'sine'],
-};
 
 export function createAudio() {
   let ctx: AudioContext | null = null;
@@ -48,6 +74,9 @@ export function createAudio() {
     /* default: sound on */
   }
   let birdTimer = 3;
+  let profileId: VehicleId | null = null;
+  let gear = 0;
+  let rpm = 800;
 
   function noiseLoop(dest: AudioNode) {
     const src = ctx!.createBufferSource();
@@ -75,21 +104,41 @@ export function createAudio() {
     const d = noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
-    // car engine: two detuned oscillators through a low-pass
+    // car engine: (sawtooth + sub-octave square) → lope wobble → soft clip → low-pass, plus intake noise
     const eg = ctx.createGain();
     eg.gain.value = 0;
     const ef = ctx.createBiquadFilter();
     ef.type = 'lowpass';
-    ef.Q.value = 4;
-    const o1 = ctx.createOscillator();
-    const o2 = ctx.createOscillator();
-    o2.detune.value = 18;
-    o1.connect(ef);
-    o2.connect(ef);
-    ef.connect(eg).connect(master);
-    o1.start();
-    o2.start();
-    engine = { osc1: o1, osc2: o2, filter: ef, gain: eg };
+    ef.Q.value = 2.5;
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = softClip(3);
+    shaper.oversample = '2x';
+    const lopeGain = ctx.createGain(); // carrier gain wobbled by the lope LFO
+    lopeGain.gain.value = 0.7;
+    const lope = ctx.createOscillator();
+    const lopeDepth = ctx.createGain();
+    lopeDepth.gain.value = 0.25;
+    lope.connect(lopeDepth).connect(lopeGain.gain);
+    const main = ctx.createOscillator();
+    main.type = 'sawtooth';
+    const sub = ctx.createOscillator();
+    sub.type = 'square';
+    const subGain = ctx.createGain();
+    subGain.gain.value = 0.55;
+    main.connect(lopeGain);
+    sub.connect(subGain).connect(lopeGain);
+    lopeGain.connect(shaper).connect(ef).connect(eg).connect(master);
+    const intake = ctx.createBiquadFilter();
+    intake.type = 'bandpass';
+    intake.Q.value = 1.2;
+    const intakeGain = ctx.createGain();
+    intakeGain.gain.value = 0;
+    intake.connect(intakeGain).connect(eg);
+    noiseLoop(intake);
+    main.start();
+    sub.start();
+    lope.start();
+    engine = { main, sub, lope, lopeDepth, shaper, filter: ef, intake, intakeGain, gain: eg };
 
     // jet: roaring noise + turbine whine
     const rg = ctx.createGain();
@@ -157,17 +206,34 @@ export function createAudio() {
 
   function update(s: SoundState, dt: number) {
     if (!ctx) return;
-    const [idle, perMs, fbase, wave] = ENGINES[s.vehicle];
-    const car = idle > 0;
-    if (car) {
-      if (engine.osc1.type !== wave) engine.osc1.type = engine.osc2.type = wave;
-      // fake gears: pitch climbs then drops every ~12 m/s
-      const gearSpeed = s.speed % 12;
-      const f = idle + gearSpeed * perMs * 2 + s.speed * perMs * 0.6;
-      set(engine.osc1.frequency, f);
-      set(engine.osc2.frequency, f * 1.5);
-      set(engine.filter.frequency, fbase + s.throttle * 1400 + s.speed * 25);
-      set(engine.gain.gain, 0.05 + s.throttle * 0.09);
+    const E = ENGINES[s.vehicle];
+    if (E) {
+      if (profileId !== s.vehicle) {
+        profileId = s.vehicle;
+        engine.shaper.curve = softClip(E.growl);
+        engine.lopeDepth.gain.value = E.lope * 0.5;
+        gear = 0;
+        rpm = E.idle;
+      }
+      // gearbox: shift up near the top of each gear, down with a little hysteresis
+      const top = (g: number) => GEARS[g] * E.topSpeed;
+      while (gear < GEARS.length - 1 && s.speed > top(gear) * 0.97) gear++;
+      while (gear > 0 && s.speed < top(gear - 1) * 0.8) gear--;
+      const low = gear === 0 ? 0 : top(gear - 1) * 0.8;
+      const inGear = clamp((s.speed - low) / (top(gear) - low), 0, 1);
+      // on throttle the revs follow the road speed; off throttle they fall toward idle (but stay tied to the wheels)
+      const target = E.idle + (E.redline - E.idle) * (0.12 + inGear * 0.88) * (0.55 + s.throttle * 0.45);
+      const free = s.grounded ? target : E.idle + (E.redline - E.idle) * s.throttle * 0.9; // in the air the engine free-revs
+      rpm += (free - rpm) * (1 - Math.exp(-(s.throttle > 0.1 ? 9 : 4) * dt));
+      const fire = (rpm / 60) * (E.cylinders / 2); // firing frequency (4-stroke)
+      set(engine.main.frequency, fire, 0.03);
+      set(engine.sub.frequency, fire / 2, 0.03);
+      set(engine.lope.frequency, rpm / 120, 0.03); // once per two crank turns
+      const load = s.throttle;
+      set(engine.filter.frequency, E.tone + fire * (1.5 + load * 3), 0.05);
+      set(engine.intake.frequency, fire * 3, 0.05);
+      set(engine.intakeGain.gain, load * 0.05, 0.05);
+      set(engine.gain.gain, 0.045 + load * 0.085 + (rpm / E.redline) * 0.03, 0.06);
     } else set(engine.gain.gain, 0);
 
     if (s.vehicle === 'jet') {

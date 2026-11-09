@@ -72,9 +72,9 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
       const follow = t.kind === 'jet' ? 2.5 : t.kind === 'heli' ? 2 : t.speed > 3 ? 3.5 : 1.2;
       camYaw = first ? t.heading : dampAngle(camYaw, t.heading, follow, dt);
 
-      const basePitch = t.kind === 'jet' ? 0.2 : t.kind === 'heli' ? 0.42 : 0.34;
+      const basePitch = t.kind === 'jet' ? 0.24 : t.kind === 'heli' ? 0.45 : 0.4;
       const pitch = THREE.MathUtils.clamp(basePitch + orbitPitch, 0.02, 1.2);
-      const dist = (t.kind === 'jet' ? 17 : t.kind === 'heli' ? 15 : 8.5 + t.speed * 0.07) * t.scale * zoom;
+      const dist = (t.kind === 'jet' ? 22 : t.kind === 'heli' ? 20 : 12 + t.speed * 0.1) * t.scale * zoom;
       const yaw = camYaw + orbitYaw + Math.PI; // behind the vehicle
 
       if (first) focus.copy(t.position);

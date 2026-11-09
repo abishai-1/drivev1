@@ -3,9 +3,9 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { C } from './palette';
 import { PLACES } from './layout';
-import type { Path } from './paths';
+import { ROAD_SINK, type Path } from './paths';
 import { decalMat, ribbon, stripeTexture } from './track';
-import { type Ctx, canvasTexture, instanced, mat, shadowed, staticBox, trs } from './utils';
+import { type Ctx, canvasTexture, clearOfRoad, instanced, mat, shadowed, staticBox, trs } from './utils';
 
 export function buildRoads(ctx: Ctx) {
   const { scene, net } = ctx;
@@ -79,8 +79,8 @@ function buildJunctions(ctx: Ctx) {
     }
   }
   const disk = new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2);
-  const m = new THREE.MeshStandardMaterial({ color: 0x5d5862, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -10 });
-  instanced(scene, disk, m, found.map((f) => trs(f.x, f.y + 0.11, f.z, 0, f.r, 1, f.r)), undefined, false);
+  const m = new THREE.MeshStandardMaterial({ color: 0x5b5660, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -10 }); // matches the street asphalt
+  instanced(scene, disk, m, found.map((f) => trs(f.x, f.y + 0.11 - ROAD_SINK, f.z, 0, f.r, 1, f.r)), undefined, false);
 }
 
 /** Decks, railings and colliders wherever a road crosses water. */
@@ -103,10 +103,10 @@ function buildBridges(ctx: Ctx, road: Path) {
     const b = points[Math.min(i + 1, points.length - 1)];
     const pitch = Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z));
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-pitch, yaw, 0, 'YXZ'));
-    deck.push(new THREE.Matrix4().compose(new THREE.Vector3(p.x, p.y - 0.3, p.z), q, new THREE.Vector3(hw * 2 + 1, 0.6, 2.6)));
+    deck.push(new THREE.Matrix4().compose(new THREE.Vector3(p.x, p.y - ROAD_SINK - 0.3, p.z), q, new THREE.Vector3(hw * 2 + 1, 0.6, 2.6)));
     // physics: thin slab under the road surface (the terrain is carved away below)
     const body = new CANNON.Body({ mass: 0, shape: new CANNON.Box(new CANNON.Vec3(hw + 0.5, 0.3, 1.3)) });
-    body.position.set(p.x, p.y - 0.3, p.z);
+    body.position.set(p.x, p.y - ROAD_SINK - 0.3, p.z);
     body.quaternion.set(q.x, q.y, q.z, q.w);
     ctx.world.addBody(body);
     if (!onSpan) continue;
@@ -136,10 +136,21 @@ function buildSignposts(ctx: Ctx) {
       [road.points.length - 5, -1, road.from],
     ];
     for (const [i, dir, name] of ends) {
-      const p = road.points[i];
       const t = road.tangents[i];
-      const x = p.x - t.z * (road.halfWidth + 2.2);
-      const z = p.z + t.x * (road.halfWidth + 2.2);
+      // try the right side, then the left, a bit further along if needed; never stand in another road
+      let spot: [number, number] | null = null;
+      for (const shift of [0, 3, 6]) {
+        const j = Math.min(Math.max(i + dir * shift, 0), road.points.length - 1);
+        const q = road.points[j];
+        const u = road.tangents[j];
+        for (const side of [1, -1]) {
+          const sx = q.x - u.z * side * (road.halfWidth + 2.2);
+          const sz = q.z + u.x * side * (road.halfWidth + 2.2);
+          if (!spot && clearOfRoad(ctx, sx, sz, 0.8)) spot = [sx, sz];
+        }
+      }
+      if (!spot) continue;
+      const [x, z] = spot;
       const y = ctx.terrain.sample(x, z);
       const post = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.25, 3, 0.25), mat(0x8a5a44)));
       post.position.set(x, y + 1.5, z);

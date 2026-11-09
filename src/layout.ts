@@ -15,35 +15,45 @@ export interface Place {
   flat?: number;
 }
 
-export const WORLD_HALF = 400; // terrain covers -400..400 on x and z
+/** World scale: every position below is multiplied by this (sizes of things are not). */
+const S = 1.25;
+const at = (x: number, z: number): [number, number] => [x * S, z * S];
+const pts = (list: [number, number][]) => list.map(([x, z]) => at(x, z));
+const place = (id: string, name: string, x: number, z: number, radius: number, flat?: number): Place => ({
+  id, name, x: x * S, z: z * S, radius, flat,
+});
+
+export const WORLD_HALF = 500; // terrain covers -500..500 on x and z
 export const GRID_STEP = 2; // terrain / heightfield resolution (m)
-export const ISLAND_R = 330; // rough coastline radius (noise pushes it ±30)
+export const ISLAND_R = 412; // rough coastline radius (noise pushes it ±25)
 export const WATER_Y = 0;
 
 export const PLACES: Record<PlaceId, Place> = {
-  home: { id: 'home', name: 'Home', x: 0, z: 0, radius: 24, flat: 2 },
-  city: { id: 'city', name: 'City', x: 26, z: -195, radius: 66, flat: 2 },
-  stadium: { id: 'stadium', name: 'Stadium', x: 215, z: -26, radius: 50, flat: 2 },
-  beach: { id: 'beach', name: 'Lighthouse Beach', x: 182, z: 195, radius: 36, flat: 1.1 },
-  studio: { id: 'studio', name: 'Film Studio', x: -39, z: 231, radius: 40, flat: 2 },
-  jungle: { id: 'jungle', name: 'Jungle', x: -156, z: 150, radius: 90 },
-  canyon: { id: 'canyon', name: 'Canyon', x: -247, z: 13, radius: 75 },
-  airport: { id: 'airport', name: 'Airport', x: -169, z: -169, radius: 100, flat: 2 },
-  village: { id: 'village', name: 'Village', x: 115, z: 95, radius: 36, flat: 2 },
-  farm: { id: 'farm', name: 'Farm', x: -100, z: -20, radius: 44, flat: 2 },
-  windfarm: { id: 'windfarm', name: 'Wind Farm', x: 240, z: -150, radius: 50 },
-  lake: { id: 'lake', name: 'Lake', x: -45, z: -95, radius: 20 },
+  home: place('home', 'Home', 0, 0, 26, 2),
+  city: place('city', 'City', 26, -195, 66, 2),
+  stadium: place('stadium', 'Stadium', 215, -26, 50, 2),
+  beach: place('beach', 'Lighthouse Beach', 182, 195, 38, 1.1),
+  studio: place('studio', 'Film Studio', -39, 231, 40, 2),
+  jungle: place('jungle', 'Jungle', -156, 150, 105),
+  canyon: place('canyon', 'Canyon', -247, 13, 85),
+  airport: place('airport', 'Airport', -169, -169, 100, 2),
+  village: place('village', 'Village', 115, 95, 38, 2),
+  farm: place('farm', 'Farm', -100, -20, 46, 2),
+  windfarm: place('windfarm', 'Wind Farm', 240, -150, 60),
+  lake: place('lake', 'Lake', -45, -95, 22),
 };
 
 /** Flat stunt area inside the canyon. */
-export const STUNT_PAD: Place = { id: 'stunt', name: 'Stunt Park', x: -218, z: 58, radius: 28, flat: 2 };
+export const STUNT_PAD: Place = place('stunt', 'Stunt Park', -218, 58, 28, 2);
 
-/** Crop fields at the farm: [centerX, centerZ, halfWidth, halfDepth]. */
-export const FARM_FIELDS: [number, number, number, number][] = [
-  [-118, -45, 14, 9],
-  [-82, -48, 12, 8],
-  [-124, 4, 10, 12],
-];
+/** Crop fields at the farm, relative to its center: [dx, dz, halfWidth, halfDepth]. */
+export const FARM_FIELDS: [number, number, number, number][] = (
+  [
+    [-18, -25, 14, 9],
+    [18, -28, 12, 8],
+    [-24, 24, 10, 12],
+  ] as const
+).map(([dx, dz, hx, hz]) => [PLACES.farm.x + dx, PLACES.farm.z + dz, hx, hz]);
 
 /** Runway runs diagonally across the airport; `side` points away from the race track. */
 export const RUNWAY = {
@@ -68,11 +78,11 @@ export const TRACK_HALF_WIDTH = 5.5;
 /** Track start/finish is the sample closest to this point. */
 export const TRACK_START: [number, number] = [PLACES.stadium.x, PLACES.stadium.z];
 // Closed loop: stadium → city → airport → canyon → jungle → studio → beach → stadium
-export const TRACK_POINTS: [number, number][] = [
+export const TRACK_POINTS: [number, number][] = pts([
   [215, 26], [215, -78], [169, -150], [97, -195], [26, -195], [-45, -195], [-78, -153], [-130, -98],
   [-195, -46], [-266, 6], [-260, 78], [-221, 140], [-156, 162], [-124, 214], [-72, 198], [26, 254],
   [104, 250], [169, 234], [247, 143], [254, 72],
-];
+]);
 
 // ---------- Road network ----------
 export interface RoadDef {
@@ -88,35 +98,38 @@ const STREET_HW = 4;
 const street = (id: string, a: [number, number], b: [number, number]): RoadDef => ({
   id, from: 'City', to: 'City', points: [a, b], halfWidth: STREET_HW,
 });
+// city street grid lines (relative to the city center; the city itself isn't scaled)
+const CX = [-45, -15, 15, 45];
+const CITY_EDGE = 56;
+const cityPoint = (dx: number, dz: number): [number, number] => [C.x + dx, C.z + dz];
+const lakeShore = at(-26, -80); // ~8 m back from the water's edge
 
 export const ROADS: RoadDef[] = [
-  { id: 'home-city', from: 'Home', to: 'City', halfWidth: 4.5, points: [[0, -18], [3, -60], [8, -100], [11, -142]] },
-  { id: 'home-stadium', from: 'Home', to: 'Stadium', halfWidth: 4.5, points: [[18, 2], [80, -5], [140, -18], [188, -26]] },
-  { id: 'home-beach', from: 'Home', to: 'Lighthouse Beach', halfWidth: 4.5, points: [[14, 14], [60, 55], [115, 95], [150, 140], [170, 178]] },
-  { id: 'home-studio', from: 'Home', to: 'Film Studio', halfWidth: 4.5, points: [[-2, 22], [-8, 90], [-20, 160], [-35, 200]] },
-  { id: 'home-canyon', from: 'Home', to: 'Stunt Park', halfWidth: 4.5, points: [[-20, -2], [-60, -10], [-100, -20], [-150, 10], [-195, 45]] },
-  { id: 'farm-airport', from: 'Farm', to: 'Airport', halfWidth: 4, points: [[-100, -20], [-112, -70], [-128, -110], [-145, -140]] },
-  { id: 'city-windfarm', from: 'City', to: 'Wind Farm', halfWidth: 4, points: [[81, -180], [130, -186], [190, -162], [232, -150]] },
-  { id: 'village-stadium', from: 'Village', to: 'Stadium', halfWidth: 4, points: [[130, 82], [175, 35], [205, 8]] },
+  { id: 'home-city', from: 'Home', to: 'City', halfWidth: 4.5, points: [at(0, -18), at(3, -60), at(8, -100), [C.x - 15, C.z + 90], cityPoint(-15, CITY_EDGE)] },
+  { id: 'home-stadium', from: 'Home', to: 'Stadium', halfWidth: 4.5, points: pts([[18, 2], [80, -5], [140, -18], [188, -26]]) },
+  { id: 'home-beach', from: 'Home', to: 'Lighthouse Beach', halfWidth: 4.5, points: pts([[14, 14], [60, 55], [115, 95], [150, 140], [170, 178]]) },
+  { id: 'home-studio', from: 'Home', to: 'Film Studio', halfWidth: 4.5, points: pts([[-2, 22], [-8, 90], [-20, 160], [-35, 200]]) },
+  { id: 'home-canyon', from: 'Home', to: 'Stunt Park', halfWidth: 4.5, points: pts([[-20, -2], [-60, -10], [-100, -20], [-150, 10], [-198, 48]]) },
+  { id: 'farm-airport', from: 'Farm', to: 'Airport', halfWidth: 4, points: pts([[-100, -20], [-112, -70], [-128, -110], [-148, -146]]) },
+  { id: 'city-windfarm', from: 'City', to: 'Wind Farm', halfWidth: 4, points: [cityPoint(CITY_EDGE, 15), ...pts([[130, -186], [190, -162], [232, -150]])] },
+  { id: 'village-stadium', from: 'Village', to: 'Stadium', halfWidth: 4, points: [...pts([[130, 82], [175, 35]]), [PLACES.stadium.x, PLACES.stadium.z + 34]] },
+  { id: 'city-airport', from: 'City', to: 'Airport', halfWidth: 4, points: [cityPoint(-CITY_EDGE, -15), ...pts([[-80, -205], [-128, -174]])] },
+  { id: 'studio-jungle', from: 'Film Studio', to: 'Jungle Temple', halfWidth: 4, points: pts([[-72, 236], [-104, 210], [-128, 172], [-136, 140]]) },
+  { id: 'lake-spur', from: 'Home', to: 'Lake', halfWidth: 3.5, points: [at(3, -60), at(-12, -72), lakeShore] },
   // city grid
-  street('st-x1', [C.x - 15, C.z - 56], [C.x - 15, C.z + 56]),
-  street('st-x2', [C.x + 15, C.z - 56], [C.x + 15, C.z + 56]),
-  street('st-x3', [C.x - 45, C.z - 40], [C.x - 45, C.z + 40]),
-  street('st-x4', [C.x + 45, C.z - 40], [C.x + 45, C.z + 40]),
-  street('st-z1', [C.x - 56, C.z - 15], [C.x + 56, C.z - 15]),
-  street('st-z2', [C.x - 56, C.z + 15], [C.x + 56, C.z + 15]),
-  street('st-z3', [C.x - 40, C.z - 45], [C.x + 40, C.z - 45]),
-  street('st-z4', [C.x - 40, C.z + 45], [C.x + 40, C.z + 45]),
+  ...CX.map((dx, i) => street(`st-x${i}`, cityPoint(dx, Math.abs(dx) > 30 ? -40 : -CITY_EDGE), cityPoint(dx, Math.abs(dx) > 30 ? 40 : CITY_EDGE))),
+  ...CX.map((dz, i) => street(`st-z${i}`, cityPoint(Math.abs(dz) > 30 ? -40 : -CITY_EDGE, dz), cityPoint(Math.abs(dz) > 30 ? 40 : CITY_EDGE, dz))),
 ];
+export const CITY_STREETS = CX;
 
 // ---------- Rivers & lakes ----------
-export const RIVER_HALF_WIDTH = 7;
+export const RIVER_HALF_WIDTH = 7.5;
 export const RIVERS: [number, number][][] = [
   // from the lake, east under the city road and the track, out to sea in the north-east
-  [[-45, -95], [-10, -112], [40, -118], [100, -126], [150, -168], [180, -205], [210, -250], [245, -310], [270, -370]],
+  pts([[-45, -95], [-10, -112], [40, -118], [100, -126], [150, -168], [180, -205], [210, -250], [245, -310], [285, -390]]),
   // down from the canyon hills, through the jungle, out to sea in the south
-  [[-225, 95], [-200, 135], [-175, 185], [-140, 215], [-115, 255], [-105, 300], [-100, 370]],
+  pts([[-225, 95], [-200, 135], [-175, 185], [-140, 215], [-115, 255], [-105, 300], [-100, 390]]),
 ];
 export const LAKES: { x: number; z: number; r: number }[] = [{ x: PLACES.lake.x, z: PLACES.lake.z, r: PLACES.lake.radius }];
 
-export const HOME_SPAWN = { x: 0, z: 6, yaw: Math.PI }; // facing north
+export const HOME_SPAWN = { x: 0, z: 8, yaw: Math.PI }; // facing north, toward the ABISHAI wall

@@ -61,9 +61,10 @@ export function buildVillage(ctx: Ctx) {
           for (let f = -2; f <= 2; f++) {
             const px = gx + Math.cos(yaw) * f * 1.4;
             const pz = gz - Math.sin(yaw) * f * 1.4;
-            fencePosts.push(trs(px, y + 0.5, pz, yaw, 0.15, 1, 0.15));
+            fencePosts.push(trs(px, ctx.terrain.sample(px, pz) + 0.5, pz, yaw, 0.15, 1, 0.15));
           }
-          fenceRails.push(trs(gx, y + 0.75, gz, yaw, 5.8, 0.12, 0.08), trs(gx, y + 0.4, gz, yaw, 5.8, 0.12, 0.08));
+          const gy = ctx.terrain.sample(gx, gz);
+          fenceRails.push(trs(gx, gy + 0.75, gz, yaw, 5.8, 0.12, 0.08), trs(gx, gy + 0.4, gz, yaw, 5.8, 0.12, 0.08));
         }
       }
     }

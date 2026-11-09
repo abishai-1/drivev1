@@ -1,6 +1,7 @@
 // Splines sampled every 2 m with a spatial hash: the race track, roads and rivers all use this.
 import * as THREE from 'three';
 import {
+  PLACES, STUNT_PAD,
   LAKES, RIVERS, RIVER_HALF_WIDTH, ROADS, TRACK_HALF_WIDTH, TRACK_POINTS, TRACK_START, WATER_Y,
 } from './layout';
 
@@ -9,6 +10,8 @@ const CELL = 20;
 const MIN_ROAD_Y = 1.4;
 const BRIDGE_Y = 3.2;
 const MAX_GRADE = 0.09; // 9% max road slope
+/** Ground under a road sits this far below the sampled road height; road visuals and bridge decks match it. */
+export const ROAD_SINK = 0.12;
 
 export interface Path {
   id: string;
@@ -171,14 +174,27 @@ export function buildNetwork(baseHeight: (x: number, z: number) => number): Netw
   // Roads are settled in priority order (track first). Where a road meets one already settled, its height
   // is pinned to that road's, so junctions meet flush instead of one road being buried under the other.
   const done: Path[] = [];
+  const flats = [...Object.values(PLACES), STUNT_PAD].filter((p) => p.flat !== undefined);
   for (const road of roads) {
     road.points.forEach((p, i) => {
       p.y = Math.max(smoothBase(p.x, p.z), MIN_ROAD_Y);
+      // inside flat places (plazas, the city…) the road lies on the flat ground, not the averaged hills
+      for (const f of flats) {
+        const d = Math.hypot(p.x - f.x, p.z - f.z);
+        const w = d < f.radius ? 1 : d < f.radius + 25 ? 1 - (d - f.radius) / 25 : 0;
+        if (w > 0) p.y += (f.flat! - p.y) * w;
+      }
       const wet = Math.min(riverIndex.nearest(p.x, p.z, true).dist, lakeDist(p.x, p.z));
       if (wet < road.halfWidth + 4) road.bridge[i] = true;
       if (wet < road.halfWidth + 14) p.y = Math.max(p.y, BRIDGE_Y); // ramp up to the deck
     });
     const pins = new Map<number, number>();
+    // samples well inside a flat place stay exactly on its flat ground
+    road.points.forEach((p, i) => {
+      // (a little past the edge too: roads often start right at a place's boundary)
+      const f = flats.find((fl) => Math.hypot(p.x - fl.x, p.z - fl.z) < fl.radius + 6);
+      if (f) pins.set(i, f.flat!);
+    });
     if (done.length) {
       const index = new PathIndex(done);
       road.points.forEach((p, i) => {

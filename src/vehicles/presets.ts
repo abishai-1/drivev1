@@ -102,8 +102,9 @@ export const GROUND: Record<'jeep' | 'sports' | 'monster' | 'buggy', GroundPrese
     },
   },
   buggy: {
-    half: [0.8, 0.3, 1.3], mass: 90, wheelRadius: 0.52, wheelWidth: 0.42, wheelX: 0.95, wheelZ: 1.05, wheelY: 0,
-    restLength: 0.45, travel: 0.35, stiffness: 26, gripFront: 2.4, gripRear: 1.45, engine: 950, maxSpeed: 36, steer: 0.62,
+    // light and nimble, but with balanced grip so it doesn't spin out (handbrake still drifts it)
+    half: [0.85, 0.3, 1.4], mass: 115, wheelRadius: 0.52, wheelWidth: 0.42, wheelX: 1.0, wheelZ: 1.15, wheelY: 0,
+    restLength: 0.45, travel: 0.35, stiffness: 30, gripFront: 2.7, gripRear: 2.5, engine: 1050, maxSpeed: 36, steer: 0.48,
     jump: 10, camScale: 0.95,
     build() {
       const g = new THREE.Group();

@@ -24,30 +24,31 @@ export function addDynamicBox(ctx: Ctx, size: THREE.Vector3, pos: THREE.Vector3,
   return body;
 }
 
-// 3x5 pixel font for brick words; add letters as needed.
+// 5x7 pixel font for brick words (readable from the chase camera); add letters as needed.
 const FONT: Record<string, string[]> = {
-  A: ['111', '101', '111', '101', '101'],
-  B: ['110', '101', '110', '101', '110'],
-  E: ['111', '100', '111', '100', '111'],
-  H: ['101', '101', '111', '101', '101'],
-  I: ['111', '010', '010', '010', '111'],
-  L: ['100', '100', '100', '100', '111'],
-  O: ['111', '101', '101', '101', '111'],
-  S: ['111', '100', '111', '001', '111'],
+  A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
+  B: ['11110', '10001', '10001', '11110', '10001', '10001', '11110'],
+  E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
+  H: ['10001', '10001', '10001', '11111', '10001', '10001', '10001'],
+  I: ['11111', '00100', '00100', '00100', '00100', '00100', '11111'],
+  L: ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
+  O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
+  S: ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
 };
 
 /** A word in loose bricks, reading along +x (faces a camera looking north). */
 export function buildBrickWord(ctx: Ctx, word: string, center: THREE.Vector3) {
-  const B = 0.7;
-  const letterW = 4 * B;
-  const startX = center.x - (word.length * letterW) / 2;
+  const B = 0.6;
+  const letterW = 6 * B; // 5 columns + 1 gap
+  const rows = 7;
+  const startX = center.x - (word.length * letterW - B) / 2;
   [...word.toUpperCase()].forEach((ch, li) => {
     const glyph = FONT[ch];
     if (!glyph) throw new Error(`No brick glyph for "${ch}"; add it to FONT in world.ts`);
     glyph.forEach((row, ri) => {
       [...row].forEach((bit, ci) => {
         if (bit !== '1') return;
-        const p = new THREE.Vector3(startX + li * letterW + ci * B, center.y + (4 - ri) * B + B / 2, center.z);
+        const p = new THREE.Vector3(startX + li * letterW + ci * B, center.y + (rows - 1 - ri) * B + B / 2, center.z);
         addDynamicBox(ctx, new THREE.Vector3(B, B, B), p, li % 2 ? C.car : C.leaf, 1.5);
       });
     });
@@ -167,18 +168,18 @@ export function buildCountryside(ctx: Ctx) {
     avoid.every((p) => Math.hypot(x - p.x, z - p.z) > p.radius + 6);
   // forests cluster where a low-frequency noise is high; a few lone trees elsewhere
   const forest = (x: number, z: number) => fbm(x / 70 + 40, z / 70 - 12, 3);
-  plantTrees(ctx, 'pine', scatter(0, 0, ISLAND_R, 900, (x, z) => open(x, z, 4) && (forest(x, z) > 0.55 || rand() < 0.06), [0.8, 1.7]));
-  plantTrees(ctx, 'broadleaf', scatter(0, 0, ISLAND_R, 160, (x, z) => open(x, z, 4) && forest(x, z) < 0.42 && rand() < 0.5, [0.6, 1.1]));
+  plantTrees(ctx, 'pine', scatter(0, 0, ISLAND_R, 1400, (x, z) => open(x, z, 4) && (forest(x, z) > 0.55 || rand() < 0.06), [0.8, 1.7]));
+  plantTrees(ctx, 'broadleaf', scatter(0, 0, ISLAND_R, 260, (x, z) => open(x, z, 4) && forest(x, z) < 0.42 && rand() < 0.5, [0.6, 1.1]));
 
   // bushes (no collision), swaying
-  const bushes = scatter(0, 0, ISLAND_R, 900, (x, z) => open(x, z, 1.5), [0.5, 1.3]).map(([x, z, s]) =>
+  const bushes = scatter(0, 0, ISLAND_R, 1400, (x, z) => open(x, z, 1.5), [0.5, 1.3]).map(([x, z, s]) =>
     trs(x, ctx.terrain.sample(x, z) + 0.35 * s, z, rand() * 6, s * 1.3, s * 0.85, s * 1.3)
   );
   const bushColors = bushes.map(() => new THREE.Color().setHSL(0.24 + rand() * 0.08, 0.45, 0.3 + rand() * 0.12));
   instanced(ctx.scene, new THREE.IcosahedronGeometry(1, 0), windify(mat(0xffffff), 0.12, -1), bushes, bushColors);
 
   // rocks: small ones are decoration, big ones are solid
-  const rocks = scatter(0, 0, ISLAND_R, 260, (x, z) => open(x, z, 2), [0.4, 2.2]);
+  const rocks = scatter(0, 0, ISLAND_R, 400, (x, z) => open(x, z, 2), [0.4, 2.2]);
   const rockM = rocks.map(([x, z, r]) => {
     const y = ctx.terrain.sample(x, z);
     if (r > 1.1) {

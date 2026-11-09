@@ -113,13 +113,27 @@ export function createGroundVehicle(ctx: Ctx, id: keyof typeof GROUND): Vehicle 
         if (fwdSpeed > 1.5) brake = 14; // moving forwards: brake first, then reverse
         else if (fwdSpeed > -P.maxSpeed * 0.4) force = P.engine * 0.6;
       } else {
-        brake = 0.8; // gentle coasting drag
+        brake = 0.4; // gentle coasting drag
+      }
+
+      // stability (arcade): downforce keeps the car planted; unless you're on the handbrake, sideways sliding
+      // bleeds off and the turn rate is capped by speed, so a hard turn carves instead of spinning out
+      if (touching >= 2) {
+        body.applyForce(new CANNON.Vec3(0, -P.mass * Math.min(speed, 40) * 0.25, 0));
+        if (!(enabled && keys.handbrake)) {
+          body.quaternion.vmult(X, localX);
+          const lateral = body.velocity.dot(localX);
+          body.velocity.vsub(localX.scale(lateral * (1 - Math.exp(-3 * dt))), body.velocity);
+          const maxYaw = Math.min(2.4, 24 / Math.max(speed, 1));
+          body.angularVelocity.y = THREE.MathUtils.clamp(body.angularVelocity.y, -maxYaw, maxYaw);
+          if (!keys.left && !keys.right) body.angularVelocity.y *= Math.exp(-4 * dt);
+        }
       }
       vehicle.applyEngineForce(force, 2);
       vehicle.applyEngineForce(force, 3);
       load = THREE.MathUtils.damp(load, Math.abs(force) / P.engine, 6, dt);
 
-      const limit = P.steer * THREE.MathUtils.clamp(1 - speed / 45, 0.3, 1);
+      const limit = P.steer * THREE.MathUtils.clamp(1 - speed / 38, 0.22, 1); // calmer steering at speed
       const want = enabled ? (keys.left ? limit : 0) + (keys.right ? -limit : 0) : 0;
       steer = THREE.MathUtils.damp(steer, want, 10, dt);
       vehicle.setSteeringValue(steer, 0);

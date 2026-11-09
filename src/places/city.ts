@@ -19,23 +19,24 @@ export function buildCity(ctx: Ctx) {
   const zoneZ = p.z + WORK_ZONE_OFFSET[1];
   let landmark = 0;
 
-  // candidate lots, closest to center first, so landmarks land downtown
+  // Lots: a 2x2 grid inside every block between the streets (lines at ±15, ±45), plus a ring of buildings
+  // just outside the grid. Closest to downtown first, so the landmark towers land in the middle.
   const lots: [number, number][] = [];
-  for (let gx = -2; gx <= 2; gx++) for (let gz = -2; gz <= 2; gz++) lots.push([p.x + gx * BLOCK, p.z + gz * BLOCK]);
+  for (const bx of [-30, 0, 30]) for (const bz of [-30, 0, 30]) for (const ox of [-4.6, 4.6]) for (const oz of [-4.6, 4.6]) lots.push([p.x + bx + ox, p.z + bz + oz]);
+  for (let s = -40; s <= 40; s += 11) {
+    lots.push([p.x + s, p.z - 57], [p.x + s, p.z + 57], [p.x - 57, p.z + s], [p.x + 57, p.z + s]);
+  }
   lots.sort((a, b) => Math.hypot(a[0] - p.x, a[1] - p.z) - Math.hypot(b[0] - p.x, b[1] - p.z));
 
-  for (const [bx, bz] of lots) {
-    if (Math.hypot(bx - p.x, bz - p.z) > p.radius - 6) continue;
-    // each block holds 1-4 buildings on a 2x2 sub-grid
-    for (const [ox, oz] of [[-6, -6], [6, -6], [-6, 6], [6, 6]]) {
-      if (rand() < 0.2) continue;
-      const x = bx + ox;
-      const z = bz + oz;
-      const w = randRange(7, 10);
-      const d = randRange(7, 10);
-      if (!clearOfRoad(ctx, x, z, Math.max(w, d) / 2 + 3)) continue;
-      if (Math.hypot(x - zoneX, z - zoneZ) < 14) continue;
-      const isLandmark = landmark < LANDMARKS.length && Math.abs(bz - p.z) <= BLOCK;
+  for (const [x, z] of lots) {
+    {
+      if (Math.hypot(x - p.x, z - p.z) > p.radius + 4) continue;
+      const w = randRange(7, 8.4);
+      const d = randRange(7, 8.4);
+      // clear of the road edge by half the building plus the 1.8 m sidewalk
+      if (!clearOfRoad(ctx, x, z, Math.max(w, d) / 2 + 2)) continue;
+      if (Math.hypot(x - zoneX, z - zoneZ) < 13) continue;
+      const isLandmark = landmark < LANDMARKS.length && Math.abs(z - p.z) <= BLOCK + 10;
       const h = isLandmark ? 42 - landmark * 5 : randRange(8, 30);
       const y = ctx.terrain.sample(x, z);
       matrices.push(trs(x, y + h / 2, z, 0, w, h, d));

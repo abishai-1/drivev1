@@ -87,6 +87,23 @@ export function staticBox(ctx: Ctx, x: number, y: number, z: number, hx: number,
 export const clearOfRoad = (ctx: Ctx, x: number, z: number, margin = 3) =>
   ctx.net.roadIndex.nearest(x, z, true).dist > margin && ctx.net.riverIndex.nearest(x, z, true).dist > 2;
 
+/**
+ * Nearest spot to (x, z) whose footprint of radius `r` is clear of roads, searched on rings out to `maxShift`.
+ * Returns the original spot if nothing better is found.
+ */
+export function clearSpot(ctx: Ctx, x: number, z: number, r: number, maxShift = 30): [number, number] {
+  if (clearOfRoad(ctx, x, z, r)) return [x, z];
+  for (let d = 2; d <= maxShift; d += 2) {
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2;
+      const nx = x + Math.cos(a) * d;
+      const nz = z + Math.sin(a) * d;
+      if (clearOfRoad(ctx, nx, nz, r)) return [nx, nz];
+    }
+  }
+  return [x, z];
+}
+
 export function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
   const canvas = document.createElement('canvas');
   canvas.width = w;

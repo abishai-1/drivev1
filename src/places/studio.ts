@@ -3,7 +3,7 @@ import { C } from '../palette';
 import { PLACES } from '../layout';
 import { type Ctx, canvasTexture, clearOfRoad, mat, shadowed, staticBox } from '../utils';
 
-export const SCREEN_OFFSET: [number, number] = [8, -22];
+export const SCREEN_OFFSET: [number, number] = [-18, 18]; // the race track cuts diagonally through the lot; keep clear of it
 
 export function buildStudio(ctx: Ctx) {
   const p = PLACES.studio;
