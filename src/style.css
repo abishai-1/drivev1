@@ -1,102 +1,12 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
+@import "tailwindcss";
 
-html, body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #f6d7b0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  color: #3b2a3f;
-}
-
-#scene { display: block; width: 100vw; height: 100vh; outline: none; }
-
-.intro {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-content: center;
-  gap: 18px;
-  text-align: center;
-  padding: 16px;
-  background: rgba(246, 215, 176, 0.75);
-  backdrop-filter: blur(6px);
-  transition: opacity 0.6s ease;
-  z-index: 10;
-}
-.intro.hidden { opacity: 0; pointer-events: none; }
-.intro h1 { font-size: clamp(2rem, 6vw, 4rem); letter-spacing: -0.02em; }
-.intro h1 span { color: #e8604c; }
-.intro p { font-size: 1.15rem; opacity: 0.8; }
-.keys { display: grid; gap: 8px; font-size: 0.95rem; opacity: 0.85; }
-kbd {
-  display: inline-block;
-  min-width: 1.8em;
-  padding: 2px 6px;
-  margin: 0 2px;
-  border-radius: 6px;
-  background: #fff7ec;
-  border-bottom: 3px solid #d9b48a;
-  font-family: inherit;
-  font-weight: 700;
-}
-#start {
-  justify-self: center;
-  margin-top: 8px;
-  padding: 14px 30px;
-  border: 0;
-  border-radius: 999px;
-  background: #e8604c;
-  color: #fff;
-  font-size: 1.05rem;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 6px 0 #b8432f;
-  transition: transform 0.1s, box-shadow 0.1s;
-}
-#start:active { transform: translateY(4px); box-shadow: 0 2px 0 #b8432f; }
-
-.panel {
-  position: fixed;
-  top: 24px;
-  right: 24px;
-  width: min(360px, calc(100vw - 32px));
-  padding: 22px 24px;
-  border-radius: 18px;
-  background: #fff7ec;
-  box-shadow: 0 12px 40px rgba(59, 42, 63, 0.18);
-  transform: translateX(calc(100% + 40px));
-  transition: transform 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2);
-  z-index: 5;
-}
-.panel.open { transform: translateX(0); }
-.panel h2 { margin-bottom: 10px; color: #e8604c; }
-.panel p { line-height: 1.55; margin-bottom: 10px; }
-.panel ul { padding-left: 18px; line-height: 1.7; }
-.panel a { color: #2f7d6d; font-weight: 600; }
-
-.touch {
-  position: fixed;
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
-  display: none;
-  gap: 10px;
-  z-index: 6;
-}
-.touch .spacer { flex: 1; }
-.touch button {
-  width: 64px;
-  height: 64px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(255, 247, 236, 0.85);
-  font-size: 1.4rem;
-  color: #3b2a3f;
-  touch-action: none;
-  user-select: none;
-}
-@media (pointer: coarse) {
-  .touch { display: flex; }
-  .panel { top: 16px; right: 16px; }
+/* Palette shared with the 3D scene (see src/palette.ts) */
+@theme {
+  --color-sky: #f6d7b0;
+  --color-ink: #3b2a3f;
+  --color-cream: #fff7ec;
+  --color-coral: #e8604c;
+  --color-coral-dark: #b8432f;
+  --color-leaf-dark: #2f7d6d;
+  --color-key-edge: #d9b48a;
 }

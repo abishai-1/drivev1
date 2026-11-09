@@ -4,34 +4,54 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Drive Folio</title>
-    <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
-    <canvas id="scene"></canvas>
+  <body class="h-full w-full overflow-hidden bg-sky font-sans text-ink">
+    <canvas id="scene" tabindex="0" class="block h-screen w-screen outline-none"></canvas>
 
-    <div id="intro" class="intro">
-      <h1>Hi, I'm <span>Your Name</span></h1>
-      <p>Hop in and drive around to explore.</p>
-      <div class="keys">
+    <div
+      id="intro"
+      class="fixed inset-0 z-10 grid place-content-center gap-4.5 bg-sky/75 p-4 text-center backdrop-blur-md transition-opacity duration-600"
+    >
+      <h1 class="text-[clamp(2rem,6vw,4rem)] font-bold tracking-tight">
+        Hi, I'm <span class="text-coral">Your Name</span>
+      </h1>
+      <p class="text-lg opacity-80">Hop in and drive around to explore.</p>
+      <div
+        class="grid gap-2 text-[0.95rem] opacity-85 [&_kbd]:mx-0.5 [&_kbd]:inline-block [&_kbd]:min-w-[1.8em] [&_kbd]:rounded-md [&_kbd]:border-b-3 [&_kbd]:border-key-edge [&_kbd]:bg-cream [&_kbd]:px-1.5 [&_kbd]:py-0.5 [&_kbd]:font-bold"
+      >
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows to drive</div>
         <div><kbd>Space</kbd> brake · <kbd>Shift</kbd> boost · <kbd>R</kbd> reset</div>
       </div>
-      <button id="start">Start engine</button>
+      <button
+        id="start"
+        class="mt-2 cursor-pointer justify-self-center rounded-full bg-coral px-7.5 py-3.5 text-[1.05rem] font-bold text-white shadow-[0_6px_0_var(--color-coral-dark)] transition active:translate-y-1 active:shadow-[0_2px_0_var(--color-coral-dark)]"
+      >
+        Start engine
+      </button>
     </div>
 
-    <aside id="panel" class="panel">
-      <h2 id="panel-title"></h2>
-      <div id="panel-body"></div>
+    <aside
+      id="panel"
+      class="fixed top-4 right-4 z-5 w-[min(360px,calc(100vw-32px))] translate-x-[calc(100%+40px)] rounded-2xl bg-cream px-6 py-5.5 shadow-[0_12px_40px_rgba(59,42,63,0.18)] transition-transform duration-450 ease-[cubic-bezier(0.2,0.9,0.3,1.2)] sm:top-6 sm:right-6"
+    >
+      <h2 id="panel-title" class="mb-2.5 text-xl font-bold text-coral"></h2>
+      <div
+        id="panel-body"
+        class="[&_a]:font-semibold [&_a]:text-leaf-dark [&_a]:underline [&_code]:rounded [&_code]:bg-sky/60 [&_code]:px-1 [&_p]:mb-2.5 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-4.5 [&_ul]:leading-[1.7]"
+      ></div>
     </aside>
 
-    <div id="touch" class="touch">
+    <div
+      id="touch"
+      class="fixed right-4 bottom-4 left-4 z-6 hidden gap-2.5 pointer-coarse:flex [&_button]:size-16 [&_button]:touch-none [&_button]:rounded-full [&_button]:bg-cream/85 [&_button]:text-2xl [&_button]:select-none"
+    >
       <button data-key="left">◀</button>
       <button data-key="right">▶</button>
-      <span class="spacer"></span>
+      <span class="flex-1"></span>
       <button data-key="back">▼</button>
       <button data-key="forward">▲</button>
     </div>
 
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
