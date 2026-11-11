@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { C } from '../palette';
 import type { Keys } from '../input';
-import { type Ctx, mat, shadowed, syncObject } from '../utils';
+import { type Ctx, shadowed, syncObject } from '../utils';
+import { toonSolid as mat } from '../look'; // your own vehicle never fades out of view
 import { vehicleInfo } from './presets';
 import type { Vehicle } from './types';
 

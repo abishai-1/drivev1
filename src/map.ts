@@ -96,6 +96,7 @@ export function createMap(terrain: Terrain, net: Network, track: TrackPath, zone
 
   // ---- live layer ----
   let open = false;
+  let markers: () => { x: number; z: number; color: string }[] = () => [];
   const checkpoint = (i: number) => track.points[track.checkpoints[i]];
 
   function draw(x: number, z: number, heading: number, next: number, t: number) {
@@ -121,6 +122,19 @@ export function createMap(terrain: Terrain, net: Network, track: TrackPath, zone
     g!.lineWidth = 2.5;
     g!.stroke();
 
+    // extra markers (gems, stunt run…): small diamonds
+    for (const mk of markers()) {
+      g!.save();
+      g!.translate(toPx(mk.x), toPx(mk.z));
+      g!.rotate(Math.PI / 4);
+      g!.fillStyle = mk.color;
+      g!.fillRect(-3, -3, 6, 6);
+      g!.lineWidth = 1.2;
+      g!.strokeStyle = '#fff7ec';
+      g!.strokeRect(-3, -3, 6, 6);
+      g!.restore();
+    }
+
     // you: forward (sin h, cos h) in world → (dx, dy) on the map
     g!.save();
     g!.translate(toPx(x), toPx(z));
@@ -142,6 +156,10 @@ export function createMap(terrain: Terrain, net: Network, track: TrackPath, zone
   return {
     get open() {
       return open;
+    },
+    /** Provide extra live markers (called every draw). */
+    setMarkers(fn: typeof markers) {
+      markers = fn;
     },
     toggle(force?: boolean) {
       open = force ?? !open;

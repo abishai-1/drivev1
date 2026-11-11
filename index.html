@@ -28,7 +28,7 @@
           class="grid gap-1.5 text-sm opacity-85 [&_kbd]:mx-0.5 [&_kbd]:inline-block [&_kbd]:min-w-[1.8em] [&_kbd]:rounded-md [&_kbd]:border-b-3 [&_kbd]:border-key-edge [&_kbd]:bg-cream [&_kbd]:px-1.5 [&_kbd]:py-0.5 [&_kbd]:font-sans [&_kbd]:font-bold"
         >
           <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive · <kbd>Space</kbd> jump · <kbd>Ctrl</kbd> handbrake · <kbd>Shift</kbd> boost</div>
-          <div><kbd>M</kbd> map · <kbd>V</kbd>/<kbd>Esc</kbd> pause &amp; garage · <kbd>R</kbd> reset · <kbd>N</kbd> sound · drag the mouse to look, scroll to zoom</div>
+          <div><kbd>M</kbd> map · <kbd>V</kbd>/<kbd>Esc</kbd> pause &amp; garage · <kbd>R</kbd> reset · <kbd>T</kbd> day/night · <kbd>N</kbd> sound · drag the mouse to look, scroll to zoom</div>
           <div class="opacity-80">Helicopter: <kbd>Space</kbd> up, <kbd>Ctrl</kbd> down · Jet: <kbd>W</kbd>/<kbd>S</kbd> throttle, <kbd>↑</kbd> dive, <kbd>↓</kbd> climb</div>
         </div>
 
@@ -37,7 +37,7 @@
           id="home"
           class="mt-1 hidden cursor-pointer rounded-full bg-cream px-6 py-3.5 text-[1.05rem] font-bold text-ink shadow-[0_6px_0_var(--color-key-edge)] transition active:translate-y-1 active:shadow-[0_2px_0_var(--color-key-edge)] data-[show]:inline-block"
         >
-          🏠 Back to home
+          🏁 Back to start
         </button>
         <button
           id="start"
@@ -56,16 +56,27 @@
         <span id="hud-speed" class="text-3xl font-bold tabular-nums">0</span>
         <span id="hud-unit" class="text-xs opacity-70">km/h</span>
       </div>
-      <div id="hud-lap" class="font-semibold tabular-nums">Drive to the stadium</div>
-      <div class="flex gap-3 text-xs opacity-70 tabular-nums">
-        <span id="hud-best">Best --:--.-</span>
-        <span id="hud-cp"></span>
+      <!-- race / stunt run: only while one is running -->
+      <div id="hud-race" class="hidden data-[on]:block">
+        <div id="hud-lap" class="font-semibold tabular-nums"></div>
+        <div class="flex gap-3 text-xs opacity-70 tabular-nums">
+          <span id="hud-best"></span>
+          <span id="hud-cp"></span>
+        </div>
+      </div>
+      <!-- exploration progress -->
+      <div class="mt-0.5 flex gap-3 text-xs font-semibold tabular-nums opacity-80">
+        <span id="hud-stops" title="Portfolio stops visited">📍 0/6</span>
+        <span id="hud-gems" title="Gems collected">💎 0/12</span>
       </div>
     </div>
     <div class="fixed right-4 bottom-4 z-5 flex items-center gap-2 pointer-coarse:top-4 pointer-coarse:bottom-auto">
-      <span class="pointer-events-none hidden rounded-full bg-cream/70 px-3 py-1.5 text-xs opacity-80 pointer-fine:inline">M map · Esc pause · R reset · drag to look</span>
+      <span class="pointer-events-none hidden rounded-full bg-cream/70 px-3 py-1.5 text-xs opacity-80 pointer-fine:inline">M map · T day/night · Esc pause · R reset · drag to look</span>
       <button id="mute" type="button" aria-label="Toggle sound" class="grid size-9 cursor-pointer place-items-center rounded-full bg-cream/85 text-base shadow">🔊</button>
     </div>
+
+    <!-- boost: a soft speed vignette -->
+    <div id="boost-fx" class="pointer-events-none fixed inset-0 z-4 opacity-0 transition-opacity duration-300 [background:radial-gradient(ellipse_at_center,transparent_55%,rgba(255,247,236,0.55)_100%)]"></div>
 
     <div
       id="toast"
@@ -99,6 +110,8 @@
         <li><span class="mr-1.5 inline-block size-2.5 rounded-full border-2 border-gold"></span>Next checkpoint</li>
         <li><span class="mr-1.5 inline-block h-1 w-4 rounded bg-ink align-middle"></span>Race track</li>
         <li><span class="mr-1.5 text-coral">▲</span>You</li>
+        <li><span class="mr-1.5 inline-block size-2 rotate-45 bg-[#59c3e8] outline-1 outline-cream"></span>Gem</li>
+        <li><span class="mr-1.5 inline-block size-2 rotate-45 bg-leaf-dark outline-1 outline-cream"></span>Stunt run</li>
       </ul>
     </aside>
 

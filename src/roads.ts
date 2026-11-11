@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { C } from './palette';
 import { PLACES } from './layout';
+import { addHalo, glow } from './sky';
 import { ROAD_SINK, type Path } from './paths';
 import { decalMat, ribbon, stripeTexture } from './track';
 import { type Ctx, canvasTexture, clearOfRoad, instanced, mat, shadowed, staticBox, trs } from './utils';
@@ -196,10 +197,11 @@ function buildLamps(ctx: Ctx) {
       const y = ctx.terrain.sample(x, z);
       poles.push(trs(x, y + 2.6, z, 0, 0.16, 5.2, 0.16));
       heads.push(trs(x, y + 5.3, z, 0, 0.75, 0.35, 0.75));
+      addHalo(x, y + 5.1, z, 7);
       staticBox(ctx, x, y + 2.6, z, 0.12, 2.6, 0.12);
     }
   }
   const box = new THREE.BoxGeometry(1, 1, 1);
   instanced(ctx.scene, box, mat(C.carDark), poles);
-  instanced(ctx.scene, box, new THREE.MeshStandardMaterial({ color: 0xfff2b0, emissive: 0xffe27a, emissiveIntensity: 0.9 }), heads, undefined, false);
+  instanced(ctx.scene, box, glow(new THREE.MeshStandardMaterial({ color: 0xfff2b0, emissive: 0xffe27a, emissiveIntensity: 0.6 }), 0xffe9a8, 0.6, 2.4), heads, undefined, false);
 }

@@ -5,6 +5,7 @@ import { WORLD_HALF } from './layout';
 import type { Terrain } from './terrain';
 import { rand } from './utils';
 import { windUniforms } from './wind';
+import { nightTint } from './sky';
 
 const vertex = /* glsl */ `
   uniform float uTime;
@@ -75,10 +76,11 @@ const vertex = /* glsl */ `
 `;
 
 const fragment = /* glsl */ `
+  uniform vec3 uTint;
   varying vec3 vColor;
   #include <fog_pars_fragment>
   void main() {
-    gl_FragColor = vec4(vColor, 1.0);
+    gl_FragColor = vec4(vColor * uTint, 1.0);
     #include <colorspace_fragment>
     #include <fog_fragment>
   }
@@ -121,6 +123,7 @@ export function createGrass(scene: THREE.Scene, terrain: Terrain, count: number,
   material.uniforms.uColor.value = terrain.colorTexture;
   material.uniforms.uTime = windUniforms.uTime;
   material.uniforms.uWind = windUniforms.uWind;
+  material.uniforms.uTint = nightTint;
 
   const mesh = new THREE.Mesh(geo, material);
   mesh.frustumCulled = false; // blades are positioned in the shader

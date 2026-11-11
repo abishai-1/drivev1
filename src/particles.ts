@@ -165,8 +165,15 @@ export function createParticles(scene: THREE.Scene, renderer: THREE.WebGLRendere
       v3.copy(back).multiplyScalar(6);
       emit(at, { count: 1, spread: 0.3, vel: v3, velJitter: 1, size: [0.5, 0.9], life: [0.3, 0.6], color: hot > 0.5 ? [0xffb36b, 0xff7a2a] : [0xd8d0c8], grow: 2.5, drag: 2, alpha: 0.7, windy: 0.2 });
     },
-    splash(at: THREE.Vector3) {
-      emit(at, { count: 70, spread: 2, vel: [0, 7, 0], velJitter: 7, size: [0.3, 0.7], life: [0.6, 1.2], color: [0xffffff, 0xd8f3f0], gravity: 16, drag: 0.5, alpha: 0.9, windy: 0.1 });
+    /** Big splash: a tall crown of droplets plus a low ring of mist. */
+    splash(at: THREE.Vector3, strength = 1) {
+      const s = Math.max(0.5, strength);
+      emit(at, { count: Math.round(110 * s), spread: 2.2, vel: [0, 9 * s, 0], velJitter: 8 * s, size: [0.35, 0.8], life: [0.7, 1.4], color: [0xffffff, 0xd8f3f0, 0xbfeae6], gravity: 18, drag: 0.4, alpha: 0.95, windy: 0.1 });
+      emit(at, { count: Math.round(40 * s), spread: 3, vel: [0, 1.2, 0], velJitter: 5 * s, size: [1.2, 2.2], life: [0.9, 1.6], color: [0xffffff, 0xe6f7f5], grow: 2.2, drag: 2.5, alpha: 0.5, windy: 0.4 });
+    },
+    /** Spray kicked up while driving through shallow water. */
+    spray(at: THREE.Vector3, vel: { x: number; z: number }, strength: number) {
+      emit(at, { count: Math.round(4 * strength) + 1, spread: 1.2, vel: [-vel.x * 0.15, 3.5 * strength, -vel.z * 0.15], velJitter: 2.5, size: [0.25, 0.55], life: [0.4, 0.8], color: [0xffffff, 0xd8f3f0], gravity: 14, drag: 0.8, alpha: 0.85, windy: 0.1 });
     },
     sparks(at: THREE.Vector3) {
       emit(at, { count: 40, spread: 0.6, vel: [0, 5, 0], velJitter: 10, size: [0.15, 0.35], life: [0.3, 0.8], color: [0xffd27a, 0xff9a3a, 0xffffff], gravity: 12, drag: 1, alpha: 1, windy: 0 });

@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { C } from '../palette';
-import { type Ctx, mat, shadowed, syncObject } from '../utils';
+import { type Ctx, shadowed, syncObject } from '../utils';
+import { toonSolid as mat } from '../look';
 import { GROUND, vehicleInfo } from './presets';
 import type { Vehicle } from './types';
 
@@ -83,6 +84,7 @@ export function createGroundVehicle(ctx: Ctx, id: keyof typeof GROUND): Vehicle 
   let handbraking = false;
   const tyrePoints: THREE.Vector3[] = [];
   const tyrePool = [new THREE.Vector3(), new THREE.Vector3()];
+  const tyreSlots: (THREE.Vector3 | null)[] = [null, null]; // per rear wheel, null when airborne
   let skidding = false;
 
   return {
@@ -197,12 +199,14 @@ export function createGroundVehicle(ctx: Ctx, id: keyof typeof GROUND): Vehicle 
       touching = countContacts();
       // rear tyre contact points (before updateWheelTransform clears the contact flags)
       tyrePoints.length = 0;
+      tyreSlots[0] = tyreSlots[1] = null;
       skidding = handbraking;
       for (const i of [2, 3]) {
         const w = vehicle.wheelInfos[i];
         if (!w.isInContact) continue;
         const h = w.raycastResult.hitPointWorld;
         tyrePoints.push(tyrePool[i - 2].set(h.x, h.y, h.z));
+        tyreSlots[i - 2] = tyrePool[i - 2];
         if (w.sliding) skidding = true;
       }
       syncObject(mesh, body.interpolatedPosition, body.interpolatedQuaternion);
@@ -231,6 +235,6 @@ export function createGroundVehicle(ctx: Ctx, id: keyof typeof GROUND): Vehicle 
     grounded: () => touching >= 2,
     crashed: () => false,
     throttle: () => load,
-    tyres: () => ({ points: tyrePoints, sliding: skidding }),
+    tyres: () => ({ points: tyrePoints, slots: tyreSlots, sliding: skidding }),
   };
 }

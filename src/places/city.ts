@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PLACES } from '../layout';
+import { glow } from '../sky';
 import { type Ctx, clearOfRoad, instanced, makeLabel, mat, rand, randRange, staticBox, trs } from '../utils';
 
 const TOWER_COLORS = [0xe8d6c0, 0xd9b8a0, 0xc7c2d6, 0xb8d0c8, 0xf0c9a8, 0x9fb3c8, 0xe6e0d4];
@@ -63,7 +64,8 @@ export function buildCity(ctx: Ctx) {
   instanced(
     ctx.scene,
     box,
-    new THREE.MeshStandardMaterial({ color: 0x5b6f8a, emissive: 0x2b3a52, roughness: 0.3, metalness: 0.2 }),
+    // windows light up warm after dark
+    glow(new THREE.MeshStandardMaterial({ color: 0x5b6f8a, emissive: 0x2b3a52, roughness: 0.3, metalness: 0.2 }), 0xffc56b, 1, 1.3),
     windows,
     undefined,
     false

@@ -33,7 +33,7 @@ export interface Vehicle {
   /** 0..1 engine load, for sound and exhaust. */
   throttle(): number;
   /** Ground vehicles: where the rear tyres touch the ground (for dust), and whether they're skidding. */
-  tyres?(): { points: THREE.Vector3[]; sliding: boolean };
+  tyres?(): { points: THREE.Vector3[]; slots: (THREE.Vector3 | null)[]; sliding: boolean };
   /** Distance the follow camera should sit back (scales with size). */
   camScale: number;
 }

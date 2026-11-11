@@ -12,6 +12,8 @@ export interface CamTarget {
   speed: number;
   kind: 'ground' | 'heli' | 'jet';
   scale: number;
+  /** 0..1: boosting at speed widens the view. */
+  boost?: number;
 }
 
 export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCanvasElement, groundAt: (x: number, z: number) => number) {
@@ -25,6 +27,9 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
   const focus = new THREE.Vector3();
   const look = new THREE.Vector3();
   let first = true;
+  let shake = 0;
+  let fov = camera.fov;
+  const BASE_FOV = camera.fov;
 
   if (!touch) {
     canvas.addEventListener('pointerdown', (e) => {
@@ -63,6 +68,10 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
     snap() {
       first = true;
     },
+    /** Kick the camera (hard landings, crashes). */
+    shake(amount: number) {
+      shake = Math.min(1.2, shake + amount);
+    },
     update(t: CamTarget, dt: number) {
       idle += dt;
       if (!dragging && idle > 2.5) {
@@ -72,7 +81,8 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
       const follow = t.kind === 'jet' ? 2.5 : t.kind === 'heli' ? 2 : t.speed > 3 ? 3.5 : 1.2;
       camYaw = first ? t.heading : dampAngle(camYaw, t.heading, follow, dt);
 
-      const basePitch = t.kind === 'jet' ? 0.24 : t.kind === 'heli' ? 0.45 : 0.4;
+      // ground: a flatter angle that shows the road ahead, not just the car
+      const basePitch = t.kind === 'jet' ? 0.24 : t.kind === 'heli' ? 0.45 : 0.27;
       const pitch = THREE.MathUtils.clamp(basePitch + orbitPitch, 0.02, 1.2);
       const dist = (t.kind === 'jet' ? 22 : t.kind === 'heli' ? 20 : 12 + t.speed * 0.1) * t.scale * zoom;
       const yaw = camYaw + orbitYaw + Math.PI; // behind the vehicle
@@ -88,8 +98,23 @@ export function createCameraRig(camera: THREE.PerspectiveCamera, canvas: HTMLCan
       const floor = groundAt(camera.position.x, camera.position.z) + 1.2;
       if (camera.position.y < floor) camera.position.y = floor;
 
-      look.set(focus.x + Math.sin(camYaw) * 2.5, focus.y + 1.2, focus.z + Math.cos(camYaw) * 2.5);
+      // aim past the car, further ahead the faster you go
+      const ahead = t.kind === 'ground' ? 6 + Math.min(t.speed, 40) * 0.15 : 2.5;
+      look.set(focus.x + Math.sin(camYaw) * ahead, focus.y + (t.kind === 'ground' ? 2.2 : 1.2), focus.z + Math.cos(camYaw) * ahead);
+      if (shake > 0.001) {
+        const k = shake * shake * 0.6;
+        camera.position.x += (Math.random() - 0.5) * k;
+        camera.position.y += (Math.random() - 0.5) * k;
+        look.y += (Math.random() - 0.5) * k * 0.5;
+        shake *= Math.exp(-6 * dt);
+      }
       camera.lookAt(look);
+      const wantFov = BASE_FOV + (t.boost ?? 0) * 9;
+      if (Math.abs(wantFov - fov) > 0.01) {
+        fov += (wantFov - fov) * (1 - Math.exp(-4 * dt));
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+      }
       first = false;
     },
   };

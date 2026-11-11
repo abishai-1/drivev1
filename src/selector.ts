@@ -40,5 +40,9 @@ export function createSelector(initial: VehicleId, onChange: (id: VehicleId) => 
     get selected() {
       return selected;
     },
+    set(id: VehicleId) {
+      selected = id;
+      render();
+    },
   };
 }

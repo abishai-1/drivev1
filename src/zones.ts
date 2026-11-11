@@ -137,7 +137,12 @@ export function createZones({ scene, terrain }: Ctx): Zone[] {
 export function updateZones(zones: Zone[], at: THREE.Vector3, t: number): Zone | null {
   let inside: Zone | null = null;
   for (const z of zones) {
-    const on = Math.hypot(at.x - z.pos.x, at.z - z.pos.z) < ZONE_R && Math.abs(at.y - z.pos.y) < 6;
+    const d = Math.hypot(at.x - z.pos.x, at.z - z.pos.z);
+    const on = d < ZONE_R && Math.abs(at.y - z.pos.y) < 6;
+    // the label hides when you're right at the zone (the panel takes over) and far away
+    const lm = z.label.material;
+    lm.opacity = THREE.MathUtils.smoothstep(d, ZONE_R + 6, ZONE_R + 30) * (1 - THREE.MathUtils.smoothstep(d, 140, 200));
+    z.label.visible = lm.opacity > 0.01;
     if (on) inside = z;
     z.label.position.y = z.pos.y + 4 + Math.sin(t * 2 + z.pos.x) * 0.25;
     z.ring.material.opacity = on ? 1 : 0.7;

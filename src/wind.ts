@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { WORLD_HALF } from './layout';
 import { rand } from './utils';
+import { patchMaterial } from './look';
 
 export const windUniforms = {
   uTime: { value: 0 },
@@ -27,7 +28,7 @@ export const wind = {
  * `amp` scales the bend; geometry should have its base near local y = `baseY`.
  */
 export function windify<T extends THREE.Material>(material: T, amp = 0.15, baseY = -1): T {
-  material.onBeforeCompile = (shader) => {
+  const apply = (m: THREE.Material) => patchMaterial(m, `wind-${amp}-${baseY}`, (shader) => {
     shader.uniforms.uTime = windUniforms.uTime;
     shader.uniforms.uWind = windUniforms.uWind;
     shader.vertexShader =
@@ -46,8 +47,9 @@ export function windify<T extends THREE.Material>(material: T, amp = 0.15, baseY
         transformed.x += uWind.x * wSway * wBend * ${amp.toFixed(3)};
         transformed.z += uWind.y * wSway * wBend * ${amp.toFixed(3)};`
       );
-  };
-  material.customProgramCacheKey = () => `wind-${amp}-${baseY}`;
+  });
+  apply(material);
+  material.userData.motion = { key: `wind-${amp}-${baseY}`, apply }; // outlines sway with the crown
   return material;
 }
 

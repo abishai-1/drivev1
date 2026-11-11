@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { C } from './palette';
 import { WORLD_HALF, WATER_Y } from './layout';
 import type { Terrain } from './terrain';
+import { nightTint } from './sky';
 
 const vertex = /* glsl */ `
   uniform float uTime;
@@ -24,6 +25,7 @@ const fragment = /* glsl */ `
   uniform vec3 uDeep;
   uniform vec3 uShallow;
   uniform vec3 uFoam;
+  uniform vec3 uTint;
   varying vec3 vWorld;
   #include <fog_pars_fragment>
   float hash(vec2 p) {
@@ -56,7 +58,7 @@ const fragment = /* glsl */ `
     col += glint * far * 0.35 * (1.0 - shore);
     col = mix(col, uFoam, clamp(foam, 0.0, 1.0) * 0.85);
 
-    gl_FragColor = vec4(col, 0.92);
+    gl_FragColor = vec4(col * uTint, 0.92);
     #include <colorspace_fragment>
     #include <fog_fragment>
   }
@@ -97,6 +99,7 @@ export function createWater(scene: THREE.Scene, terrain: Terrain) {
     ]),
   });
   material.uniforms.uShore.value = shore; // set after merge (merge clones textures)
+  material.uniforms.uTint = nightTint; // shared, live
 
   const water = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400, 240, 240).rotateX(-Math.PI / 2), material);
   water.position.y = WATER_Y;

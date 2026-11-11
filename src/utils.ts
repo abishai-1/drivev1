@@ -3,6 +3,7 @@ import * as CANNON from 'cannon-es';
 import type { Terrain } from './terrain';
 import type { TrackPath } from './track';
 import type { Network } from './paths';
+import { outline, outlineMaterial, toon, trackHull } from './look';
 
 /** Shared handles every builder needs. */
 export interface Ctx {
@@ -24,13 +25,14 @@ export function el<T extends HTMLElement = HTMLElement>(id: string): T {
   return node as T;
 }
 
-export const mat = (color: number) =>
-  new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true });
+/** Toon-shaded solid material (see look.ts). */
+export const mat = (color: number) => toon(color);
 
+/** Cast + receive shadows, and ink the silhouette. */
 export function shadowed<T extends THREE.Mesh>(mesh: T): T {
   mesh.castShadow = true;
   mesh.receiveShadow = true;
-  return mesh;
+  return outline(mesh);
 }
 
 /** Copy a cannon position/rotation onto a three object (their vector types are not interchangeable). */
@@ -69,7 +71,7 @@ export function instanced(
   const p = new THREE.Vector3();
   matrices.forEach((t, i) => {
     p.setFromMatrixPosition(t);
-    const key = matrices.length > 150 ? Math.floor(p.x / 120) * 1000 + Math.floor(p.z / 120) : 0;
+    const key = matrices.length > 300 ? Math.floor(p.x / 160) * 1000 + Math.floor(p.z / 160) : 0;
     const g = groups.get(key);
     if (g) g.push(i);
     else groups.set(key, [i]);
@@ -86,6 +88,15 @@ export function instanced(
     m.receiveShadow = true;
     m.computeBoundingSphere();
     scene.add(m);
+    if (shadows && !material.transparent) {
+      // ink outline: a back-face hull drawn with the same instance matrices
+      const o = new THREE.InstancedMesh(geo, outlineMaterial(material), Math.max(idx.length, 1));
+      o.instanceMatrix = m.instanceMatrix;
+      o.count = m.count;
+      o.boundingSphere = m.boundingSphere;
+      scene.add(o);
+      trackHull(o);
+    }
   }
 }
 

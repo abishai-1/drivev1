@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { C } from '../palette';
-import { mat, shadowed } from '../utils';
+import { shadowed } from '../utils';
+import { toonSolid as mat } from '../look'; // your own vehicle never fades out of view
 import type { VehicleId, VehicleInfo } from './types';
 
 export const VEHICLES: VehicleInfo[] = [
