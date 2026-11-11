@@ -63,15 +63,30 @@ export function instanced(
   colors?: THREE.Color[],
   shadows = true
 ) {
-  const m = new THREE.InstancedMesh(geo, material, Math.max(matrices.length, 1));
-  m.count = matrices.length;
-  matrices.forEach((t, i) => m.setMatrixAt(i, t));
-  colors?.forEach((c, i) => m.setColorAt(i, c));
-  m.castShadow = shadows;
-  m.receiveShadow = true;
-  m.computeBoundingSphere();
-  scene.add(m);
-  return m;
+  // big sets spread across the island are split into 120 m cells so off-screen ones are culled
+  // (one island-wide InstancedMesh is always drawn, twice with shadows)
+  const groups = new Map<number, number[]>();
+  const p = new THREE.Vector3();
+  matrices.forEach((t, i) => {
+    p.setFromMatrixPosition(t);
+    const key = matrices.length > 150 ? Math.floor(p.x / 120) * 1000 + Math.floor(p.z / 120) : 0;
+    const g = groups.get(key);
+    if (g) g.push(i);
+    else groups.set(key, [i]);
+  });
+  if (!groups.size) groups.set(0, []);
+  for (const idx of groups.values()) {
+    const m = new THREE.InstancedMesh(geo, material, Math.max(idx.length, 1));
+    m.count = idx.length;
+    idx.forEach((src, i) => {
+      m.setMatrixAt(i, matrices[src]);
+      if (colors?.[src]) m.setColorAt(i, colors[src]);
+    });
+    m.castShadow = shadows;
+    m.receiveShadow = true;
+    m.computeBoundingSphere();
+    scene.add(m);
+  }
 }
 
 /** Invisible static collider (half extents). */

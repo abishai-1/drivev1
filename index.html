@@ -28,10 +28,17 @@
           class="grid gap-1.5 text-sm opacity-85 [&_kbd]:mx-0.5 [&_kbd]:inline-block [&_kbd]:min-w-[1.8em] [&_kbd]:rounded-md [&_kbd]:border-b-3 [&_kbd]:border-key-edge [&_kbd]:bg-cream [&_kbd]:px-1.5 [&_kbd]:py-0.5 [&_kbd]:font-sans [&_kbd]:font-bold"
         >
           <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive · <kbd>Space</kbd> jump · <kbd>Ctrl</kbd> handbrake · <kbd>Shift</kbd> boost</div>
-          <div><kbd>M</kbd> map · <kbd>V</kbd> garage · <kbd>R</kbd> reset · <kbd>N</kbd> sound · drag the mouse to look, scroll to zoom</div>
+          <div><kbd>M</kbd> map · <kbd>V</kbd>/<kbd>Esc</kbd> pause &amp; garage · <kbd>R</kbd> reset · <kbd>N</kbd> sound · drag the mouse to look, scroll to zoom</div>
           <div class="opacity-80">Helicopter: <kbd>Space</kbd> up, <kbd>Ctrl</kbd> down · Jet: <kbd>W</kbd>/<kbd>S</kbd> throttle, <kbd>↑</kbd> dive, <kbd>↓</kbd> climb</div>
         </div>
 
+        <div class="flex flex-wrap items-center justify-center gap-3">
+        <button
+          id="home"
+          class="mt-1 hidden cursor-pointer rounded-full bg-cream px-6 py-3.5 text-[1.05rem] font-bold text-ink shadow-[0_6px_0_var(--color-key-edge)] transition active:translate-y-1 active:shadow-[0_2px_0_var(--color-key-edge)] data-[show]:inline-block"
+        >
+          🏠 Back to home
+        </button>
         <button
           id="start"
           disabled
@@ -39,6 +46,7 @@
         >
           Building the island…
         </button>
+        </div>
       </div>
     </div>
 
@@ -55,7 +63,7 @@
       </div>
     </div>
     <div class="fixed right-4 bottom-4 z-5 flex items-center gap-2 pointer-coarse:top-4 pointer-coarse:bottom-auto">
-      <span class="pointer-events-none hidden rounded-full bg-cream/70 px-3 py-1.5 text-xs opacity-80 pointer-fine:inline">M map · V garage · R reset · drag to look</span>
+      <span class="pointer-events-none hidden rounded-full bg-cream/70 px-3 py-1.5 text-xs opacity-80 pointer-fine:inline">M map · Esc pause · R reset · drag to look</span>
       <button id="mute" type="button" aria-label="Toggle sound" class="grid size-9 cursor-pointer place-items-center rounded-full bg-cream/85 text-base shadow">🔊</button>
     </div>
 

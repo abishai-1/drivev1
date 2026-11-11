@@ -20,7 +20,8 @@ export function createGroundVehicle(ctx: Ctx, id: keyof typeof GROUND): Vehicle 
   mesh.add(bodyMesh);
   scene.add(mesh);
 
-  const body = new CANNON.Body({ mass: P.mass, allowSleep: false });
+  // low-friction chassis: if it scrapes a crest or kerb it slides over instead of being tripped onto its roof
+  const body = new CANNON.Body({ mass: P.mass, allowSleep: false, material: ctx.materials.slide });
   body.addShape(new CANNON.Box(new CANNON.Vec3(...P.half)), new CANNON.Vec3(0, drop, 0));
   body.angularDamping = 0.4;
 
@@ -69,6 +70,11 @@ export function createGroundVehicle(ctx: Ctx, id: keyof typeof GROUND): Vehicle 
   const localQ = new CANNON.Quaternion();
   const Z = new CANNON.Vec3(0, 0, 1);
   const X = new CANNON.Vec3(1, 0, 0);
+  const Y = new CANNON.Vec3(0, 1, 0);
+  const up = new CANNON.Vec3();
+  const downforce = new CANNON.Vec3();
+  const upright = new CANNON.Quaternion();
+  let upsideDown = 0;
 
   // cannon-es resets isInContact inside updateWheelTransform(), so count contacts before sync() calls it
   let touching = 0;
@@ -119,7 +125,7 @@ export function createGroundVehicle(ctx: Ctx, id: keyof typeof GROUND): Vehicle 
       // stability (arcade): downforce keeps the car planted; unless you're on the handbrake, sideways sliding
       // bleeds off and the turn rate is capped by speed, so a hard turn carves instead of spinning out
       if (touching >= 2) {
-        body.applyForce(new CANNON.Vec3(0, -P.mass * Math.min(speed, 40) * 0.25, 0));
+        body.applyForce(downforce.set(0, -P.mass * Math.min(speed, 40) * 0.25, 0));
         if (!(enabled && keys.handbrake)) {
           body.quaternion.vmult(X, localX);
           const lateral = body.velocity.dot(localX);
@@ -129,6 +135,27 @@ export function createGroundVehicle(ctx: Ctx, id: keyof typeof GROUND): Vehicle 
           if (!keys.left && !keys.right) body.angularVelocity.y *= Math.exp(-4 * dt);
         }
       }
+      // anti-roll: on the ground, ease the car back upright and soak up roll/pitch spin, so cambered roads,
+      // kerbs and junction lips can't tip it over (jumps and air control are untouched)
+      body.quaternion.vmult(Y, up);
+      if (touching >= 1) {
+        const k = 9 * dt;
+        body.angularVelocity.x += -up.z * k;
+        body.angularVelocity.z += up.x * k;
+        const damp = Math.exp(-3 * dt);
+        body.angularVelocity.x *= damp;
+        body.angularVelocity.z *= damp;
+      }
+      // stuck on its side or roof: flip back onto the wheels after a moment
+      upsideDown = up.y < 0.35 && speed < 4 ? upsideDown + dt : 0;
+      if (upsideDown > 1.2) {
+        upsideDown = 0;
+        body.position.y += 1.2;
+        body.quaternion.copy(upright.setFromEuler(0, Math.atan2(fwd.x, fwd.z), 0));
+        body.angularVelocity.setZero();
+        body.velocity.setZero();
+      }
+
       vehicle.applyEngineForce(force, 2);
       vehicle.applyEngineForce(force, 3);
       load = THREE.MathUtils.damp(load, Math.abs(force) / P.engine, 6, dt);

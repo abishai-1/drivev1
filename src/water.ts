@@ -26,6 +26,9 @@ const fragment = /* glsl */ `
   uniform vec3 uFoam;
   varying vec3 vWorld;
   #include <fog_pars_fragment>
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
   void main() {
     vec2 uv = (vWorld.xz + uHalf) / (2.0 * uHalf);
     float h = -8.0;
@@ -35,8 +38,22 @@ const fragment = /* glsl */ `
     float shore = smoothstep(-1.8, 0.2, h);
     float bands = 0.5 + 0.5 * sin(h * 6.0 - uTime * 2.0);
     float foam = shore * smoothstep(0.6, 0.95, bands) + smoothstep(-0.35, 0.15, h);
-    float s = sin(vWorld.x * 0.35 + uTime) * sin(vWorld.z * 0.3 - uTime * 1.3);
-    col += smoothstep(0.88, 1.0, s) * 0.1;
+    // sun glints: random cells, each a soft streak along the swell that twinkles on its own clock
+    // (no regular grid), faded out with distance so far water doesn't shimmer into noise
+    float glint = 0.0;
+    for (int l = 0; l < 2; l++) {
+      float fl = float(l);
+      vec2 p = vWorld.xz * vec2(0.45, 0.9) * (1.0 + fl * 0.7) + vec2(uTime * (0.25 + fl * 0.15), fl * 17.0);
+      vec2 cell = floor(p);
+      vec2 f = fract(p) - 0.5;
+      float r = hash(cell + fl * 31.0);
+      vec2 o = vec2(hash(cell + 7.0), hash(cell + 13.0)) - 0.5;
+      float d = length((f - o * 0.6) * vec2(1.0, 2.6));
+      float tw = pow(max(sin(uTime * (1.5 + r * 2.5) + r * 40.0), 0.0), 6.0);
+      glint += step(0.72, r) * smoothstep(0.22, 0.0, d) * tw;
+    }
+    float far = smoothstep(140.0, 40.0, distance(cameraPosition.xz, vWorld.xz));
+    col += glint * far * 0.35 * (1.0 - shore);
     col = mix(col, uFoam, clamp(foam, 0.0, 1.0) * 0.85);
 
     gl_FragColor = vec4(col, 0.92);

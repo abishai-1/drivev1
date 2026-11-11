@@ -189,27 +189,22 @@ export function buildTerrain(scene: THREE.Scene, world: CANNON.World, groundMat:
   };
 
   // visible mesh + baked textures for the grass shader
-  const geo = new THREE.PlaneGeometry(WORLD_HALF * 2, WORLD_HALF * 2, n - 1, n - 1);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
+  const colors = new Float32Array(n * n * 3);
   const data = new Float32Array(n * n * 4);
   const colorBytes = new Uint8Array(n * n * 4);
   const c = new THREE.Color();
   const srgb = { r: 0, g: 0, b: 0 };
-  for (let v = 0; v < pos.count; v++) {
-    const x = pos.getX(v);
-    const z = pos.getZ(v);
-    const i = Math.round((x + WORLD_HALF) / GRID_STEP);
-    const j = Math.round((z + WORLD_HALF) / GRID_STEP);
-    const k = i + j * n;
+  for (let k = 0; k < n * n; k++) {
+    const i = k % n;
+    const j = (k - i) / n;
+    const x = i * GRID_STEP - WORLD_HALF;
+    const z = j * GRID_STEP - WORLD_HALF;
     const h = H[k];
-    pos.setY(v, h);
     const hx = H[Math.min(i + 1, n - 1) + j * n] - H[Math.max(i - 1, 0) + j * n];
     const hz = H[i + Math.min(j + 1, n - 1) * n] - H[i + Math.max(j - 1, 0) * n];
     const slope = Math.hypot(hx, hz) / (2 * GRID_STEP);
     groundColor(x, z, h, slope, c);
-    colors.set([c.r, c.g, c.b], v * 3);
+    colors.set([c.r, c.g, c.b], k * 3);
 
     // grass density: none on water, sand, pavement, rock, roads, runway, plaza, crop fields
     let dens = 0.85 + placeWeight(PLACES.jungle, x, z, 20) * 0.15;
@@ -227,11 +222,30 @@ export function buildTerrain(scene: THREE.Scene, world: CANNON.World, groundMat:
     c.getRGB(srgb, THREE.SRGBColorSpace);
     colorBytes.set([srgb.r * 255, srgb.g * 255, srgb.b * 255, 255], k * 4);
   }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }));
-  mesh.receiveShadow = true;
-  scene.add(mesh);
+  // the visible ground is split into 100 m tiles so the camera (and shadow camera) only draw what they see
+  const groundMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true });
+  const T = 50; // cells per tile
+  for (let ti = 0; ti < n - 1; ti += T) {
+    for (let tj = 0; tj < n - 1; tj += T) {
+      const w = Math.min(T, n - 1 - ti);
+      const d = Math.min(T, n - 1 - tj);
+      const geo = new THREE.PlaneGeometry(w * GRID_STEP, d * GRID_STEP, w, d).rotateX(-Math.PI / 2);
+      const pos = geo.attributes.position;
+      const col = new Float32Array(pos.count * 3);
+      for (let v = 0; v < pos.count; v++) {
+        const i = ti + (v % (w + 1));
+        const j = tj + Math.floor(v / (w + 1));
+        const k = i + j * n;
+        pos.setXYZ(v, i * GRID_STEP - WORLD_HALF, H[k], j * GRID_STEP - WORLD_HALF);
+        col.set(colors.subarray(k * 3, k * 3 + 3), v * 3);
+      }
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      geo.computeBoundingSphere();
+      const mesh = new THREE.Mesh(geo, groundMaterial);
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+    }
+  }
 
   const dataTexture = new THREE.DataTexture(data, n, n, THREE.RGBAFormat, THREE.FloatType);
   dataTexture.magFilter = dataTexture.minFilter = THREE.NearestFilter;
@@ -252,6 +266,9 @@ export function buildTerrain(scene: THREE.Scene, world: CANNON.World, groundMat:
   // local (x, y, height) → world (x, height, -y); offset so local (0,0) is world (-HALF, +HALF)
   body.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
   body.position.set(-WORLD_HALF, 0, WORLD_HALF);
+  // cannon caches a new collision pillar for every terrain cell a box ever touches and never frees them, so
+  // memory grows the longer you drive and garbage-collection pauses stutter the game. Reuse one pillar instead.
+  (body.shapes[0] as CANNON.Heightfield).cacheEnabled = false;
   body.updateAABB();
   world.addBody(body);
 

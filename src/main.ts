@@ -23,14 +23,17 @@ import { createClouds, createWindStreaks, wind } from './wind';
 import { createParticles } from './particles';
 import { createAudio } from './audio';
 import { createCameraRig } from './camera';
+import { StaticHashBroadphase } from './broadphase';
 
 // ---------- Renderer / scene ----------
 const canvas = el<HTMLCanvasElement>('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+const MAX_RATIO = Math.min(window.devicePixelRatio, 1.5);
+let pixelRatio = MAX_RATIO;
+renderer.setPixelRatio(pixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(C.sky);
@@ -65,7 +68,12 @@ function followSun(target: THREE.Vector3) {
 
 // ---------- Physics ----------
 const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -20, 0) });
-world.broadphase = new CANNON.SAPBroadphase(world);
+world.broadphase = new StaticHashBroadphase(world);
+// cannon's default collision matrix is a dense N×N array (~4.5M entries for our ~3000 bodies) that it clears
+// every step: several ms per step and ~70 MB of memory. The sparse version only stores pairs that touch.
+type Matrix = CANNON.World['collisionMatrix'];
+world.collisionMatrix = new CANNON.ObjectCollisionMatrix() as unknown as Matrix;
+world.collisionMatrixPrevious = new CANNON.ObjectCollisionMatrix() as unknown as Matrix;
 world.allowSleep = true;
 world.defaultContactMaterial.friction = 0.3;
 world.defaultContactMaterial.restitution = 0.15;
@@ -77,6 +85,7 @@ world.addContactMaterial(new CANNON.ContactMaterial(groundMat, slideMat, { frict
 const intro = el('intro');
 const introTitle = el('intro-title');
 const startBtn = el<HTMLButtonElement>('start');
+const homeBtn = el<HTMLButtonElement>('home');
 const muteBtn = el<HTMLButtonElement>('mute');
 const panel = el('panel');
 const panelTitle = el('panel-title');
@@ -159,13 +168,15 @@ function init() {
       vehicle.place(p.x, Math.max(terrain.sample(p.x, p.z), p.y - 1), p.z, vehicle.heading());
     },
     toggleMap: () => playing && map.toggle(),
-    toggleGarage() {
-      if (playing) openGarage();
-      else if (intro.dataset.mode === 'garage') closeOverlay();
-    },
+    toggleGarage,
   });
+  function toggleGarage() {
+    if (playing) openGarage();
+    else if (intro.dataset.mode === 'garage') closeOverlay();
+  }
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyN' && !e.repeat) toggleMute();
+    if (e.code === 'Escape' && !e.repeat) toggleGarage(); // Esc pauses too
   });
   muteBtn.addEventListener('click', () => toggleMute());
   function toggleMute() {
@@ -180,8 +191,19 @@ function init() {
     intro.dataset.mode = 'garage';
     introTitle.innerHTML = 'Garage';
     startBtn.textContent = 'Drive';
+    homeBtn.dataset.show = '';
     intro.classList.remove('opacity-0', 'pointer-events-none');
   }
+  /** Pause screen → straight back to the Home plaza (whatever you picked in the garage). */
+  function goHome() {
+    closeOverlay();
+    Object.assign(safe, HOME_SPAWN);
+    vehicle.place(HOME_SPAWN.x, terrain.sample(HOME_SPAWN.x, HOME_SPAWN.z), HOME_SPAWN.z, HOME_SPAWN.yaw);
+    camRig.snap();
+    map.toggle(false);
+    hud.toast('Back home 🏠');
+  }
+  homeBtn.addEventListener('click', goHome);
   function closeOverlay() {
     audio.start(); // needs a user gesture
     switchVehicle(selector.selected);
@@ -213,6 +235,23 @@ function init() {
   // ---------- Loop ----------
   const clock = new THREE.Clock();
   const dustColor = new THREE.Color();
+  const WHITE = new THREE.Color(0xffffff);
+  const SAND = new THREE.Color(0xf6e3c6);
+  // adaptive resolution: if frames run slow for a couple of seconds, render fewer pixels (and back up when fast)
+  let slowTime = 0;
+  let fastTime = 0;
+  function adaptQuality(raw: number) {
+    if (raw > 1 / 45) (slowTime += raw), (fastTime = 0);
+    else if (raw < 1 / 58) (fastTime += raw), (slowTime = 0);
+    let next = pixelRatio;
+    if (slowTime > 1.5) (next = Math.max(0.6, pixelRatio - 0.2)), (slowTime = 0);
+    if (fastTime > 6) (next = Math.min(MAX_RATIO, pixelRatio + 0.1)), (fastTime = 0);
+    if (next !== pixelRatio) {
+      pixelRatio = next;
+      renderer.setPixelRatio(pixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  }
   const tmp = new THREE.Vector3();
   const back = new THREE.Vector3();
   const focus = new THREE.Vector3();
@@ -222,7 +261,9 @@ function init() {
   let wasGrounded = true;
 
   function tick() {
-    frame(Math.min(clock.getDelta(), 0.1));
+    const raw = clock.getDelta();
+    if (!document.hidden && raw < 0.5) adaptQuality(raw);
+    frame(Math.min(raw, 0.1));
     requestAnimationFrame(tick);
   }
 
@@ -233,7 +274,7 @@ function init() {
 
     const vyBefore = vehicle.body.velocity.y;
     vehicle.drive(keys, playing, dt);
-    world.step(1 / 60, dt, 3);
+    world.step(1 / 60, dt, 4);
     vehicle.sync(dt);
     for (const { mesh, body } of ctx.dynamic) {
       if (body.sleepState !== CANNON.Body.SLEEPING) syncObject(mesh, body.interpolatedPosition, body.interpolatedQuaternion);
@@ -278,7 +319,7 @@ function init() {
           const impact = Math.abs(lastVy);
           audio.land(impact);
           groundColor(p.x, p.z, ground, 0, dustColor);
-          fx.puff(tmp.set(p.x, ground + 0.3, p.z), dustColor.clone().lerp(new THREE.Color(0xffffff), 0.35), Math.min(impact / 15, 1));
+          fx.puff(tmp.set(p.x, ground + 0.3, p.z), dustColor.lerp(WHITE, 0.35).clone(), Math.min(impact / 15, 1));
         }
         airTime = 0;
       }
@@ -293,7 +334,7 @@ function init() {
         const onRoad = net.roadIndex.nearest(pt.x, pt.z, true).dist < 0;
         if (Math.random() < Math.min(1, speed / 18) * (onRoad ? 0.2 : 1)) {
           if (onRoad) dustColor.set(0xd8d0c8);
-          else groundColor(pt.x, pt.z, pt.y, 0, dustColor).lerp(new THREE.Color(0xf6e3c6), 0.45);
+          else groundColor(pt.x, pt.z, pt.y, 0, dustColor).lerp(SAND, 0.45);
           fx.dust(tmp.copy(pt).setY(pt.y + 0.2), dustColor.getHex(), 1);
         }
         if (tyres.sliding && speed > 7) fx.smoke(tmp.copy(pt).setY(pt.y + 0.3));
@@ -308,7 +349,7 @@ function init() {
       for (let k = 0; k < 2; k++) {
         const a = Math.random() * Math.PI * 2;
         tmp.set(p.x + Math.cos(a) * 3, ground + 0.3, p.z + Math.sin(a) * 3);
-        groundColor(tmp.x, tmp.z, ground, 0, dustColor).lerp(new THREE.Color(0xf6e3c6), 0.5);
+        groundColor(tmp.x, tmp.z, ground, 0, dustColor).lerp(SAND, 0.5);
         fx.emit(tmp, { vel: [Math.cos(a) * 8, 0.6, Math.sin(a) * 8], velJitter: 2, size: [0.6, 1.1], life: [0.5, 0.9], color: dustColor.getHex(), grow: 2.5, drag: 2, alpha: 0.45, windy: 0.3 });
       }
     }

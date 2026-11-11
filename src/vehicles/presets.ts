@@ -76,8 +76,8 @@ export const GROUND: Record<'jeep' | 'sports' | 'monster' | 'buggy', GroundPrese
   },
   sports: {
     half: [0.95, 0.25, 2.0], mass: 130, wheelRadius: 0.38, wheelWidth: 0.42, wheelX: 0.9, wheelZ: 1.35, wheelY: 0,
-    restLength: 0.25, travel: 0.15, stiffness: 55, gripFront: 3.2, gripRear: 3.0, engine: 1700, maxSpeed: 48, steer: 0.45,
-    jump: 6, camScale: 1.05,
+    restLength: 0.3, travel: 0.2, stiffness: 46, gripFront: 3.0, gripRear: 3.0, engine: 1700, maxSpeed: 46, steer: 0.45,
+    jump: 6, camScale: 1.05, comDrop: 0.25,
     build() {
       const g = new THREE.Group();
       g.add(box(1.9, 0.45, 4, 0x2f7d6d), box(1.5, 0.4, 1.7, C.carDark, 0, 0.4, -0.2));
